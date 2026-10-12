@@ -192,12 +192,12 @@ class OLXScraper(BaseScraper):
                     except Exception as page_err:
                         logger.debug(f"Erro ao buscar {url}: {page_err}")
 
-                # Filtra anúncios candidatos pela localização e preço antes de buscar descrições
+                # Filtra anúncios candidatos pela localização antes de buscar descrições
                 candidates = []
                 for ad in all_raw_ads:
                     price = ad["price"]
                     city = ad["city"]
-                    if price <= 0 or price > self.config.hardware.max_price_brl or price < self.config.hardware.min_price_brl:
+                    if price < 30.0:
                         continue
 
                     in_radius, distance_km = self._matches_target_region(city)
@@ -208,7 +208,7 @@ class OLXScraper(BaseScraper):
 
                 logger.info(f"OLX Regional: {len(candidates)} anúncios candidatos dentro do raio geodésico.")
 
-                # Busca descrições dos candidatos para validar VRAM e detalhes
+                # Busca descrições dos candidatos para validar modelo e detalhes
                 for ad, distance_km in candidates:
                     title = ad["title"]
                     desc = ad.get("description", "")
@@ -219,16 +219,12 @@ class OLXScraper(BaseScraper):
                         ad["description"] = desc
                         await asyncio.sleep(0.2)
 
-                    # Identifica GPU e VRAM
+                    # Identifica GPU e VRAM (qualquer placa NVIDIA)
                     gpu_info = identify_gpu(title, desc)
                     if not gpu_info:
                         continue
 
                     model_name, vram = gpu_info
-
-                    # Valida faixa de VRAM configurada (16GB a 32GB)
-                    if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
-                        continue
 
                     # Detecção de defeito / peças / conserto
                     cond, reasons = self.defect_detector.analyze(title, desc)
@@ -309,9 +305,7 @@ class OLXScraper(BaseScraper):
 
                                 title = ad["title"]
                                 price = ad["price"]
-                                city = ad["city"]
-
-                                if price <= 0 or price > self.config.hardware.max_price_brl or price < self.config.hardware.min_price_brl:
+                                if price < 30.0:
                                     continue
 
                                 # Filtra estritamente pelo raio geodésico
@@ -329,8 +323,6 @@ class OLXScraper(BaseScraper):
                                 if not gpu_info:
                                     continue
                                 model_name, vram = gpu_info
-                                if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
-                                    continue
                                 cond, reasons = self.defect_detector.analyze(title, desc)
 
                                 listing_id = f"olx_{re.sub(r'[^a-zA-Z0-9]', '', ad['url'])[-16:]}" if ad["url"] else f"olx_{len(listings)}"

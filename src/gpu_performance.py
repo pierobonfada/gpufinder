@@ -11,6 +11,242 @@ from typing import Dict, List, Optional, Tuple
 # Base de capacidade computacional oficial em Teraflops (FP32 TFLOPS)
 # Quanto maior o número de TFLOPS, mais à direita a placa fica no eixo X.
 GPU_COMPUTE_DATABASE: Dict[str, Dict] = {
+    # --- GPUs de Entrada / Clássicas ---
+    "GT 710": {
+        "compute_tflops": 0.4,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 14.4,
+        "architecture": "Kepler",
+        "vram_gb": 2,
+        "display_name": "GT 710 (0.4 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GT 730": {
+        "compute_tflops": 0.5,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 40.0,
+        "architecture": "Kepler",
+        "vram_gb": 2,
+        "display_name": "GT 730 (0.5 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "Quadro 4000": {
+        "compute_tflops": 0.5,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 89.6,
+        "architecture": "Fermi",
+        "vram_gb": 2,
+        "display_name": "Quadro 4000 (0.5 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "Quadro K2000": {
+        "compute_tflops": 0.7,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 64.0,
+        "architecture": "Kepler",
+        "vram_gb": 2,
+        "display_name": "Quadro K2000 (0.7 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "Quadro P600": {
+        "compute_tflops": 1.2,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 64.0,
+        "architecture": "Pascal",
+        "vram_gb": 2,
+        "display_name": "Quadro P600 (1.2 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 750 Ti": {
+        "compute_tflops": 1.4,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 86.4,
+        "architecture": "Maxwell",
+        "vram_gb": 2,
+        "display_name": "GTX 750 Ti (1.4 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 1050": {
+        "compute_tflops": 1.9,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 112.0,
+        "architecture": "Pascal",
+        "vram_gb": 2,
+        "display_name": "GTX 1050 (1.9 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 1050 Ti": {
+        "compute_tflops": 2.1,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 112.0,
+        "architecture": "Pascal",
+        "vram_gb": 4,
+        "display_name": "GTX 1050 Ti (2.1 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "Quadro K5200": {
+        "compute_tflops": 3.1,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 192.0,
+        "architecture": "Kepler",
+        "vram_gb": 8,
+        "display_name": "Quadro K5200 (3.1 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 1650": {
+        "compute_tflops": 3.0,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 128.0,
+        "architecture": "Turing",
+        "vram_gb": 4,
+        "display_name": "GTX 1650 (3.0 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 1060": {
+        "compute_tflops": 4.4,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 192.0,
+        "architecture": "Pascal",
+        "vram_gb": 6,
+        "display_name": "GTX 1060 (4.4 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 1660 Super": {
+        "compute_tflops": 5.0,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 336.0,
+        "architecture": "Turing",
+        "vram_gb": 6,
+        "display_name": "GTX 1660 Super (5.0 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 1070": {
+        "compute_tflops": 6.5,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 256.0,
+        "architecture": "Pascal",
+        "vram_gb": 8,
+        "display_name": "GTX 1070 (6.5 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 2060": {
+        "compute_tflops": 6.5,
+        "tensor_tflops": 52.0,
+        "memory_bandwidth_gbs": 336.0,
+        "architecture": "Turing",
+        "vram_gb": 6,
+        "display_name": "RTX 2060 (6.5 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 3050": {
+        "compute_tflops": 9.1,
+        "tensor_tflops": 73.0,
+        "memory_bandwidth_gbs": 224.0,
+        "architecture": "Ampere",
+        "vram_gb": 8,
+        "display_name": "RTX 3050 (9.1 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "GTX 1080 Ti": {
+        "compute_tflops": 11.3,
+        "tensor_tflops": 0.0,
+        "memory_bandwidth_gbs": 484.0,
+        "architecture": "Pascal",
+        "vram_gb": 11,
+        "display_name": "GTX 1080 Ti (11.3 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 3060": {
+        "compute_tflops": 12.7,
+        "tensor_tflops": 102.0,
+        "memory_bandwidth_gbs": 360.0,
+        "architecture": "Ampere",
+        "vram_gb": 12,
+        "display_name": "RTX 3060 (12.7 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 4060": {
+        "compute_tflops": 15.1,
+        "tensor_tflops": 121.0,
+        "memory_bandwidth_gbs": 272.0,
+        "architecture": "Ada Lovelace",
+        "vram_gb": 8,
+        "display_name": "RTX 4060 (15.1 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 3060 Ti": {
+        "compute_tflops": 16.2,
+        "tensor_tflops": 130.0,
+        "memory_bandwidth_gbs": 448.0,
+        "architecture": "Ampere",
+        "vram_gb": 8,
+        "display_name": "RTX 3060 Ti (16.2 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 3070": {
+        "compute_tflops": 20.3,
+        "tensor_tflops": 163.0,
+        "memory_bandwidth_gbs": 448.0,
+        "architecture": "Ampere",
+        "vram_gb": 8,
+        "display_name": "RTX 3070 (20.3 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 3070 Ti": {
+        "compute_tflops": 21.8,
+        "tensor_tflops": 174.0,
+        "memory_bandwidth_gbs": 608.0,
+        "architecture": "Ampere",
+        "vram_gb": 8,
+        "display_name": "RTX 3070 Ti (21.8 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 4070": {
+        "compute_tflops": 29.2,
+        "tensor_tflops": 233.0,
+        "memory_bandwidth_gbs": 504.0,
+        "architecture": "Ada Lovelace",
+        "vram_gb": 12,
+        "display_name": "RTX 4070 (29.2 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 3080": {
+        "compute_tflops": 29.8,
+        "tensor_tflops": 238.0,
+        "memory_bandwidth_gbs": 760.0,
+        "architecture": "Ampere",
+        "vram_gb": 10,
+        "display_name": "RTX 3080 (29.8 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 4070 Super": {
+        "compute_tflops": 35.5,
+        "tensor_tflops": 284.0,
+        "memory_bandwidth_gbs": 504.0,
+        "architecture": "Ada Lovelace",
+        "vram_gb": 12,
+        "display_name": "RTX 4070 Super (35.5 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 5070": {
+        "compute_tflops": 42.0,
+        "tensor_tflops": 600.0,
+        "memory_bandwidth_gbs": 672.0,
+        "architecture": "Blackwell",
+        "vram_gb": 12,
+        "display_name": "RTX 5070 (42.0 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    "RTX 5070 Ti": {
+        "compute_tflops": 48.0,
+        "tensor_tflops": 700.0,
+        "memory_bandwidth_gbs": 896.0,
+        "architecture": "Blackwell",
+        "vram_gb": 16,
+        "display_name": "RTX 5070 Ti (48.0 TFLOPS)",
+        "source": "TechPowerUp"
+    },
+    # --- GPUs de Datacenter e Alta VRAM ---
     "Tesla K80": {
         "compute_tflops": 4.1,
         "tensor_tflops": 0.0,

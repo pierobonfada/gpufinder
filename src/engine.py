@@ -110,15 +110,70 @@ class GPUHunterEngine:
                 self.progress.logs = self.progress.logs[-30:]
             logger.info(log_msg)
 
+    def filter_listings(
+        self,
+        listings: List[GPUListing],
+        min_vram_gb: Optional[int] = None,
+        max_vram_gb: Optional[int] = None,
+        max_price: Optional[float] = None,
+        min_price: Optional[float] = None,
+        radius_km: Optional[float] = None,
+        condition: Optional[str] = None,
+        platform: Optional[str] = None,
+        search: Optional[str] = None,
+        outliers_only: bool = False
+    ) -> List[GPUListing]:
+        """Filtra instantaneamente os anúncios do banco de dados de acordo com os parâmetros do usuário."""
+        result = []
+        for item in listings:
+            # 1. Filtro de Range de Memória VRAM (de X a Y GB)
+            if min_vram_gb is not None and item.detected_vram_gb < min_vram_gb:
+                continue
+            if max_vram_gb is not None and item.detected_vram_gb > max_vram_gb:
+                continue
+
+            # 2. Filtro de Preço
+            if max_price is not None and item.price > max_price:
+                continue
+            if min_price is not None and item.price < min_price:
+                continue
+
+            # 3. Filtro de Raio
+            if radius_km is not None and item.distance_km is not None and item.distance_km > radius_km:
+                continue
+
+            # 4. Condição
+            if condition and condition != "all" and item.condition.value != condition:
+                continue
+
+            # 5. Plataforma
+            if platform and platform != "all" and item.platform.lower() != platform.lower():
+                continue
+
+            # 6. Outliers
+            if outliers_only and not item.is_outlier:
+                continue
+
+            # 7. Busca por texto
+            if search:
+                s = search.lower().strip()
+                text_corpus = f"{item.title} {item.city} {item.detected_model} {item.platform}".lower()
+                if s not in text_corpus:
+                    continue
+
+            result.append(item)
+        return result
+
     async def run_scan(
         self, 
         include_live_scrapers: bool = True,
-        custom_max_price: Optional[float] = None,
-        custom_radius_km: Optional[float] = None
+        center_city: Optional[str] = None,
+        custom_radius_km: Optional[float] = None,
+        custom_max_price: Optional[float] = None
     ) -> ScanSummary:
         """
-        Executa a varredura ao vivo COMPLETA e EXCLUSIVAMENTE com anúncios reais.
-        Zero dados de teste sintéticos.
+        Executa a varredura ao vivo da web para a cidade e raio especificados,
+        alimentando o banco de dados com TODOS os anúncios reais da NVIDIA.
         """
         if self.is_scanning:
             logger.warning("Varredura já em andamento.")
@@ -127,14 +182,24 @@ class GPUHunterEngine:
         self.is_scanning = True
         total_steps = 7
 
-        if custom_max_price is not None and custom_max_price > 0:
-            self.config.hardware.max_price_brl = custom_max_price
+        from src.geo import get_city_coordinates, get_city_distance_from_center
+        if center_city:
+            self.config.location.center_city = center_city
+            lat, lon = get_city_coordinates(center_city)
+            self.config.location.latitude = lat
+            self.config.location.longitude = lon
+
         if custom_radius_km is not None and custom_radius_km > 0:
             self.config.location.radius_km = custom_radius_km
 
+        city = self.config.location.center_city
+        radius = self.config.location.radius_km
+        lat = self.config.location.latitude
+        lon = self.config.location.longitude
+
         self.progress = ScanProgress(
             is_scanning=True,
-            current_task="Iniciando varredura ao vivo...",
+            current_task=f"Iniciando varredura na web ao redor de {city} (Raio {radius}km)...",
             current_step=1,
             total_steps=total_steps,
             found_count=0,
@@ -143,23 +208,23 @@ class GPUHunterEngine:
         )
 
         try:
-            radius = self.config.location.radius_km
-            max_price = self.config.hardware.max_price_brl
             self._log_progress(
                 1, total_steps,
-                f"Configurando busca (Raio: {radius}km de Veranópolis, Preço Máx: R$ {max_price:,.2f})",
-                f"🚀 Iniciando varredura real: Raio {radius}km ao redor de Veranópolis - RS | Preço até R$ {max_price:,.2f}"
+                f"Configurando busca ao redor de {city} (Raio {radius}km)...",
+                f"🚀 Iniciando varredura web completa: Centro em {city} ({lat}, {lon}) | Raio de {radius}km"
             )
 
+            # Carrega banco existente para fazer merge sem perder anúncios já conhecidos
+            existing_items = {i.id: i for i in self.load_listings_from_disk()}
             listings_dict: Dict[str, GPUListing] = {}
 
             if include_live_scrapers:
-                # 1. OLX Regional (Caxias do Sul e Passo Fundo)
+                # 1. OLX Regional (regiões circunvizinhas)
                 if self.config.scrapers.olx.enabled:
                     self._log_progress(
                         2, total_steps,
-                        "Varrendo OLX Regional para 'nvidia' (páginas 1 a 3)...",
-                        f"🌐 OLX Regional: Buscando 'nvidia' em Caxias do Sul e região, inspecionando descrições para 16-32GB VRAM..."
+                        f"Varrendo OLX Regional para 'nvidia' ao redor de {city}...",
+                        f"🌐 OLX Regional: Buscando anúncios de 'nvidia' (páginas 1 a 3) e inspecionando descrições..."
                     )
                     try:
                         found = await self.olx_scraper.search_regional("nvidia", max_pages=3)
@@ -168,8 +233,8 @@ class GPUHunterEngine:
                         self.progress.found_count = len(listings_dict)
                         self._log_progress(
                             2, total_steps,
-                            f"OLX Regional: {len(found)} anúncios encontrados para 'nvidia'",
-                            f"✅ OLX: {len(found)} placa(s) encontrada(s) no raio de {radius}km (Total até agora: {len(listings_dict)})"
+                            f"OLX Regional: {len(found)} anúncios NVIDIA encontrados",
+                            f"✅ OLX: {len(found)} placa(s) NVIDIA encontrada(s) no raio de {radius}km de {city} (Total: {len(listings_dict)})"
                         )
                     except Exception as e:
                         logger.error(f"Erro ao varrer OLX para 'nvidia': {e}")
@@ -178,7 +243,7 @@ class GPUHunterEngine:
                     self._log_progress(
                         3, total_steps,
                         "Varrendo OLX RS categoria Placas de Vídeo para 'nvidia'...",
-                        "🌐 OLX RS: Buscando 'nvidia' na categoria especializada de informática/placas de vídeo..."
+                        "🌐 OLX RS: Buscando 'nvidia' na categoria de informática/placas de vídeo..."
                     )
                     try:
                         found_state = await self.olx_scraper.search_state_rs(["nvidia"])
@@ -187,8 +252,8 @@ class GPUHunterEngine:
                         self.progress.found_count = len(listings_dict)
                         self._log_progress(
                             3, total_steps,
-                            f"OLX RS: {len(found_state)} placas encontradas no raio",
-                            f"✅ OLX Estadual: {len(found_state)} placa(s) no raio de {radius}km (Total: {len(listings_dict)})"
+                            f"OLX RS: {len(found_state)} placas adicionadas",
+                            f"✅ OLX Estadual: {len(found_state)} anúncio(s) no raio de {radius}km de {city} (Total: {len(listings_dict)})"
                         )
                     except Exception as e:
                         logger.error(f"Erro ao varrer OLX Estadual: {e}")
@@ -197,8 +262,8 @@ class GPUHunterEngine:
                 if self.config.scrapers.facebook.enabled:
                     self._log_progress(
                         4, total_steps,
-                        "Consultando Facebook Marketplace RS para 'nvidia'...",
-                        "🔎 Facebook Marketplace: Conectando sessão automatizada e pesquisando 'nvidia' no RS..."
+                        f"Consultando Facebook Marketplace RS ao redor de {city}...",
+                        f"🔎 Facebook Marketplace: Conectando sessão automatizada e pesquisando 'nvidia'..."
                     )
                     try:
                         found_fb = await self.facebook_scraper.search_regional("nvidia")
@@ -208,30 +273,25 @@ class GPUHunterEngine:
                         self._log_progress(
                             4, total_steps,
                             f"Facebook: {len(found_fb)} encontrados para 'nvidia'",
-                            f"✅ Facebook: {len(found_fb)} anúncio(s) no raio de {radius}km (Total: {len(listings_dict)})"
+                            f"✅ Facebook: {len(found_fb)} anúncio(s) no raio de {radius}km de {city} (Total: {len(listings_dict)})"
                         )
                     except Exception as e:
                         logger.debug(f"Facebook Marketplace: {e}")
 
             all_raw = list(listings_dict.values())
 
-            # 4. Cálculo de distâncias geodésicas (Haversine) a partir de Veranópolis
+            # 4. Cálculo de distâncias geodésicas (Haversine) a partir da cidade central
             self._log_progress(
                 5, total_steps,
-                "Calculando distâncias geodésicas para cada cidade...",
-                f"📍 Calculando distâncias até Veranópolis (-28.9358, -51.5503) e aplicando raio de {radius}km..."
+                f"Calculando distâncias geodésicas até {city}...",
+                f"📍 Calculando distâncias até {city} ({lat}, {lon}) e aplicando raio de {radius}km..."
             )
-            from src.geo import get_city_distance_from_center
             filtered_by_location = []
             for item in all_raw:
                 if item.distance_km is None and item.city:
-                    item.distance_km = get_city_distance_from_center(item.city)
+                    item.distance_km = get_city_distance_from_center(item.city, lat, lon)
 
-                # Aplica filtro de preço configurado pelo usuário
-                if item.price > self.config.hardware.max_price_brl or item.price < self.config.hardware.min_price_brl:
-                    continue
-
-                # Aplica filtro de raio configurado pelo usuário (descarta fora do raio ou desconhecido)
+                # Descarta anúncios fora do raio de busca da cidade selecionada
                 if item.distance_km is None or item.distance_km > self.config.location.radius_km:
                     continue
 
@@ -241,7 +301,7 @@ class GPUHunterEngine:
             self._log_progress(
                 6, total_steps,
                 "Atribuindo benchmarks de capacidade computacional (TFLOPS)...",
-                "⚡ Enriquecendo anúncios com capacidade computacional FP32 TFLOPS (NVIDIA / TechPowerUp)..."
+                "⚡ Enriquecendo banco de dados com capacidade computacional FP32 TFLOPS (NVIDIA / TechPowerUp)..."
             )
             for item in filtered_by_location:
                 c_data = get_gpu_compute_data(item.detected_model)

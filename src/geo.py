@@ -1,6 +1,6 @@
 import math
 import unicodedata
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 def strip_accents(text: str) -> str:
     """Normaliza texto removendo acentos e convertendo para minúsculas."""
@@ -126,3 +126,17 @@ def is_within_radius(city_name: str, center_lat: float, center_lon: float, radiu
 
     # Desconhecido ou fora da região
     return (False, None)
+
+def get_city_coordinates(city_name: str) -> Tuple[float, float]:
+    """Retorna coordenadas (latitude, longitude) para a cidade informada ou default para Veranópolis."""
+    if not city_name:
+        return (-28.9358, -51.5503)
+    norm = strip_accents(city_name)
+    for key, (lat, lon) in CITY_COORDINATES.items():
+        if key == norm or key in norm or norm in key:
+            return (lat, lon)
+    return (-28.9358, -51.5503)
+
+def get_all_known_cities() -> List[str]:
+    """Retorna lista formatada de todas as cidades disponíveis com suporte geodésico."""
+    return sorted([k.title() for k in CITY_COORDINATES.keys()])

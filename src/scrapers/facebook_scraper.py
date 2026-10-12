@@ -172,8 +172,8 @@ class FacebookMarketplaceScraper(BaseScraper):
                         if not title_val:
                             title_val = lines[0]
 
-                        # 1. Filtro de preço
-                        if price_val <= 0 or price_val > self.config.hardware.max_price_brl or price_val < self.config.hardware.min_price_brl:
+                        # 1. Filtro de preço básico (> 30)
+                        if price_val < 30.0:
                             continue
 
                         # 2. Filtro de localização por raio geodésico (Haversine)
@@ -187,16 +187,12 @@ class FacebookMarketplaceScraper(BaseScraper):
                         if not in_radius:
                             continue
 
-                        # 3. Identificação de GPU NVIDIA e VRAM (16GB a 32GB)
+                        # 3. Identificação de GPU NVIDIA e VRAM (qualquer placa NVIDIA)
                         gpu_info = identify_gpu(title_val, text_content)
                         if not gpu_info:
                             continue
 
                         model_name, vram = gpu_info
-
-                        # 4. Verificação de limites de VRAM
-                        if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
-                            continue
 
                         # Imagem do card
                         img_el = await el.query_selector("img")

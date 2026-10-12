@@ -5,7 +5,8 @@ let currentConfig = null;
 let currentLowestItem = null;
 let currentBestDealItem = null;
 let activeFilters = {
-  vram: 'all',
+  minVram: 16,
+  maxVram: 32,
   condition: 'all',
   platform: 'all',
   maxPrice: 5000,
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     lucide.createIcons();
   }
   setupEventListeners();
+  await loadCities();
   await loadConfig();
   await loadData();
   checkScanStatus();
@@ -36,6 +38,52 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Setup event listeners
 function setupEventListeners() {
+  // --- PASSO 1: ATUALIZAÇÃO DO BANCO DE DADOS (WEB SCRAPING) ---
+  const updateDbBtn = document.getElementById('btn-update-db');
+  if (updateDbBtn) {
+    updateDbBtn.addEventListener('click', triggerScan);
+  }
+
+  // --- PASSO 2: FILTROS INSTANTÂNEOS NO BANCO DE DADOS ---
+  // Range de VRAM Mínima e Máxima
+  const minVramInput = document.getElementById('input-min-vram');
+  if (minVramInput) {
+    minVramInput.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      activeFilters.minVram = (!isNaN(val) && val >= 0) ? val : 0;
+      renderFiltered();
+    });
+  }
+
+  const maxVramInput = document.getElementById('input-max-vram');
+  if (maxVramInput) {
+    maxVramInput.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      activeFilters.maxVram = (!isNaN(val) && val >= 0) ? val : 999;
+      renderFiltered();
+    });
+  }
+
+  // Presets rápidos de VRAM
+  document.querySelectorAll('.vram-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.vram-preset-btn').forEach(b => {
+        b.classList.remove('bg-purple-600/30', 'text-purple-200', 'border-purple-500/50', 'font-bold');
+        b.classList.add('bg-slate-900', 'text-slate-300');
+      });
+      btn.classList.remove('bg-slate-900', 'text-slate-300');
+      btn.classList.add('bg-purple-600/30', 'text-purple-200', 'border-purple-500/50', 'font-bold');
+
+      const minV = parseInt(btn.dataset.min);
+      const maxV = parseInt(btn.dataset.max);
+      activeFilters.minVram = minV;
+      activeFilters.maxVram = maxV;
+      if (minVramInput) minVramInput.value = minV;
+      if (maxVramInput) maxVramInput.value = maxV;
+      renderFiltered();
+    });
+  });
+
   // Search input
   const searchInput = document.getElementById('filter-search');
   if (searchInput) {
@@ -44,20 +92,6 @@ function setupEventListeners() {
       renderFiltered();
     });
   }
-
-  // VRAM buttons
-  document.querySelectorAll('.vram-filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.vram-filter-btn').forEach(b => {
-        b.classList.remove('bg-indigo-600', 'text-white');
-        b.classList.add('text-slate-400');
-      });
-      btn.classList.add('bg-indigo-600', 'text-white');
-      btn.classList.remove('text-slate-400');
-      activeFilters.vram = btn.dataset.vram;
-      renderFiltered();
-    });
-  });
 
   // Condition buttons
   document.querySelectorAll('.cond-filter-btn').forEach(btn => {
@@ -85,7 +119,7 @@ function setupEventListeners() {
     });
   });
 
-  // Editable Max Price (Sem teto fixo)
+  // Editable Max Price (Sem teto fixo, qualquer valor)
   const priceInput = document.getElementById('input-max-price');
   if (priceInput) {
     priceInput.addEventListener('input', (e) => {
@@ -95,12 +129,6 @@ function setupEventListeners() {
     });
   }
 
-  // Search button inside toolbar
-  const toolbarSearchBtn = document.getElementById('btn-toolbar-search');
-  if (toolbarSearchBtn) {
-    toolbarSearchBtn.addEventListener('click', triggerScan);
-  }
-
   // Outliers only checkbox
   const chkOutliers = document.getElementById('chk-outliers-only');
   if (chkOutliers) {
@@ -108,12 +136,6 @@ function setupEventListeners() {
       activeFilters.outliersOnly = e.target.checked;
       renderFiltered();
     });
-  }
-
-  // Scan button (Header)
-  const runScanBtn = document.getElementById('btn-run-scan');
-  if (runScanBtn) {
-    runScanBtn.addEventListener('click', triggerScan);
   }
 
   // Toggle log box visibility button
@@ -179,21 +201,55 @@ function setupEventListeners() {
   });
 }
 
+// Carrega cidades conhecidas para o datalist de Passo 1
+async function loadCities() {
+  try {
+    const res = await fetch('/api/cities');
+    const cities = await res.json();
+    const datalist = document.getElementById('cities-list');
+    if (datalist && Array.isArray(cities)) {
+      datalist.innerHTML = cities.map(c => `<option value="${escapeHtml(c)}">`).join('');
+    }
+  } catch (e) {
+    console.warn('Erro ao carregar cidades:', e);
+  }
+}
+
 // Fetch and load data
 async function loadData() {
   try {
-    const [listingsRes, summaryRes] = await Promise.all([
+    const [listingsRes, statsRes] = await Promise.all([
       fetch('/api/listings'),
-      fetch('/api/summary')
+      fetch('/api/database/stats')
     ]);
 
     allListings = await listingsRes.json();
-    const summary = await summaryRes.json();
+    const stats = await statsRes.json();
 
-    updateKPIs(summary);
+    updateDatabaseBadges(stats.total_listings !== undefined ? stats.total_listings : allListings.length);
     renderFiltered();
   } catch (err) {
     console.error('Erro ao carregar dados:', err);
+  }
+}
+
+// Atualiza contadores do banco de dados na UI
+function updateDatabaseBadges(totalCount) {
+  const headerBadge = document.getElementById('header-db-count');
+  const badgeDb = document.getElementById('badge-db-count');
+  const step2Total = document.getElementById('step-2-total');
+  const emptyNotice = document.getElementById('empty-db-notice');
+
+  if (headerBadge) headerBadge.textContent = totalCount;
+  if (badgeDb) badgeDb.textContent = totalCount;
+  if (step2Total) step2Total.textContent = totalCount;
+
+  if (emptyNotice) {
+    if (totalCount === 0) {
+      emptyNotice.classList.remove('hidden');
+    } else {
+      emptyNotice.classList.add('hidden');
+    }
   }
 }
 
@@ -203,45 +259,86 @@ async function loadConfig() {
     const res = await fetch('/api/config');
     currentConfig = await res.json();
     if (currentConfig && currentConfig.location) {
+      const city = currentConfig.location.center_city || 'Veranópolis';
+      const rad = currentConfig.location.radius_km || 50;
       document.getElementById('header-location').textContent = 
-        `${currentConfig.location.center_city} - ${currentConfig.location.state} (Raio ${currentConfig.location.radius_km}km)`;
+        `${city} - RS e Região (Raio ${rad}km)`;
+      const cityInput = document.getElementById('input-center-city');
+      const radInput = document.getElementById('input-radius-km');
+      if (cityInput && !cityInput.value) cityInput.value = city;
+      if (radInput && !radInput.value) radInput.value = rad;
     }
   } catch (err) {
     console.error('Erro ao carregar config:', err);
   }
 }
 
-// Update KPI cards
-function updateKPIs(summary) {
-  document.getElementById('kpi-total').textContent = summary.total_found;
-  document.getElementById('kpi-working').textContent = summary.working_count;
-  document.getElementById('kpi-defective').textContent = summary.defective_count;
+// Recalcula KPIs instantaneamente para a seleção filtrada em memória
+function recalculateKPIs(filtered) {
+  const kpiTotal = document.getElementById('kpi-total');
+  const kpiWorking = document.getElementById('kpi-working');
+  const kpiDefective = document.getElementById('kpi-defective');
+  const kpiDesc = document.getElementById('kpi-filter-desc');
 
-  // Track and update Menor Preço Local
-  currentLowestItem = summary.lowest_item || allListings.find(i => i.price === summary.lowest_price) || null;
-  if (currentLowestItem && currentLowestItem.price > 0) {
-    document.getElementById('kpi-lowest-price').textContent = formatBRL(currentLowestItem.price);
-    document.getElementById('kpi-lowest-desc').textContent = `${currentLowestItem.detected_model} (${currentLowestItem.city})`;
-    const cardLowest = document.getElementById('card-kpi-lowest');
-    if (cardLowest) {
-      cardLowest.setAttribute('title', `Clique para abrir o anúncio de ${currentLowestItem.detected_model} na ${currentLowestItem.platform}`);
-    }
-  } else if (summary.lowest_price > 0) {
-    document.getElementById('kpi-lowest-price').textContent = formatBRL(summary.lowest_price);
+  if (kpiTotal) kpiTotal.textContent = filtered.length;
+
+  const workingItems = filtered.filter(i => i.condition === 'WORKING');
+  const defectiveItems = filtered.filter(i => i.condition === 'DEFECTIVE');
+
+  if (kpiWorking) kpiWorking.textContent = workingItems.length;
+  if (kpiDefective) kpiDefective.textContent = defectiveItems.length;
+
+  if (kpiDesc) {
+    const maxP = activeFilters.maxPrice >= 999999 ? 'Sem limite' : `R$ ${activeFilters.maxPrice.toLocaleString('pt-BR')}`;
+    kpiDesc.textContent = `VRAM ${activeFilters.minVram} a ${activeFilters.maxVram} GB (até ${maxP})`;
   }
 
-  // Track and update Melhor Oportunidade
-  currentBestDealItem = summary.best_deal || null;
-  if (currentBestDealItem) {
-    const bd = currentBestDealItem;
-    document.getElementById('kpi-best-deal-price').textContent = formatBRL(bd.price);
-    const diffPct = bd.price_diff_percent || 0;
-    document.getElementById('kpi-best-deal-diff').textContent = 
-      `${bd.detected_model} (${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}% vs Brasil)`;
-    const cardBestDeal = document.getElementById('card-kpi-best-deal');
-    if (cardBestDeal) {
-      cardBestDeal.setAttribute('title', `Clique para abrir o anúncio de ${bd.detected_model} na ${bd.platform}`);
+  // Menor Preço Local entre os filtrados
+  const candidateLowest = workingItems.length > 0 ? workingItems : filtered;
+  let lowestItem = null;
+  if (candidateLowest.length > 0) {
+    lowestItem = candidateLowest.reduce((prev, curr) => (curr.price > 0 && curr.price < prev.price) ? curr : prev, candidateLowest[0]);
+  }
+  currentLowestItem = lowestItem;
+
+  const lowestPriceEl = document.getElementById('kpi-lowest-price');
+  const lowestDescEl = document.getElementById('kpi-lowest-desc');
+  const cardLowest = document.getElementById('card-kpi-lowest');
+
+  if (lowestItem && lowestItem.price > 0) {
+    if (lowestPriceEl) lowestPriceEl.textContent = formatBRL(lowestItem.price);
+    if (lowestDescEl) lowestDescEl.textContent = `${lowestItem.detected_model} (${lowestItem.city})`;
+    if (cardLowest) cardLowest.setAttribute('title', `Clique para abrir o anúncio de ${lowestItem.detected_model} na ${lowestItem.platform}`);
+  } else {
+    if (lowestPriceEl) lowestPriceEl.textContent = 'R$ 0';
+    if (lowestDescEl) lowestDescEl.textContent = '-';
+  }
+
+  // Melhor Oportunidade: placa funcional com maior desconto vs mediana nacional
+  let bestDealItem = null;
+  let bestDiff = 99999;
+  for (const item of (workingItems.length > 0 ? workingItems : filtered)) {
+    if (item.price_diff_percent !== null && item.price_diff_percent !== undefined) {
+      if (item.price_diff_percent < bestDiff) {
+        bestDiff = item.price_diff_percent;
+        bestDealItem = item;
+      }
     }
+  }
+  currentBestDealItem = bestDealItem;
+
+  const bestPriceEl = document.getElementById('kpi-best-deal-price');
+  const bestDiffEl = document.getElementById('kpi-best-deal-diff');
+  const cardBestDeal = document.getElementById('card-kpi-best-deal');
+
+  if (bestDealItem) {
+    if (bestPriceEl) bestPriceEl.textContent = formatBRL(bestDealItem.price);
+    const diffPct = bestDealItem.price_diff_percent || 0;
+    if (bestDiffEl) bestDiffEl.textContent = `${bestDealItem.detected_model} (${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}% vs Brasil)`;
+    if (cardBestDeal) cardBestDeal.setAttribute('title', `Clique para abrir o anúncio de ${bestDealItem.detected_model} na ${bestDealItem.platform}`);
+  } else {
+    if (bestPriceEl) bestPriceEl.textContent = 'R$ 0';
+    if (bestDiffEl) bestDiffEl.textContent = 'vs Mediana Brasil';
   }
 }
 
@@ -372,29 +469,45 @@ function hideKpiPreview() {
 // Filter listings
 function getFilteredListings() {
   return allListings.filter(item => {
-    // VRAM filter
-    if (activeFilters.vram !== 'all' && item.detected_vram_gb !== parseInt(activeFilters.vram)) {
-      return false;
+    // VRAM range filter (de X a Y GB)
+    const vram = item.detected_vram_gb;
+    if (vram !== null && vram !== undefined) {
+      if (activeFilters.minVram !== null && activeFilters.minVram !== undefined && vram < activeFilters.minVram) {
+        return false;
+      }
+      if (activeFilters.maxVram !== null && activeFilters.maxVram !== undefined && vram > activeFilters.maxVram) {
+        return false;
+      }
+    } else {
+      // Se a VRAM não pôde ser identificada e o filtro exige > 0, exclui se minVram > 0
+      if (activeFilters.minVram && activeFilters.minVram > 0) {
+        return false;
+      }
     }
+
     // Condition filter
     if (activeFilters.condition !== 'all' && item.condition !== activeFilters.condition) {
       return false;
     }
+
     // Platform filter
     if (activeFilters.platform !== 'all' && item.platform.toLowerCase() !== activeFilters.platform.toLowerCase()) {
       return false;
     }
-    // Max price
-    if (item.price > activeFilters.maxPrice) {
+
+    // Max price (sem teto pré-fixado)
+    if (activeFilters.maxPrice && item.price > activeFilters.maxPrice) {
       return false;
     }
+
     // Outliers only
     if (activeFilters.outliersOnly && !item.is_outlier) {
       return false;
     }
+
     // Search query
     if (activeFilters.search) {
-      const matchText = `${item.title} ${item.city} ${item.detected_model} ${item.platform}`.toLowerCase();
+      const matchText = `${item.title} ${item.city} ${item.detected_model} ${item.platform} ${item.architecture || ''}`.toLowerCase();
       if (!matchText.includes(activeFilters.search)) {
         return false;
       }
@@ -403,16 +516,28 @@ function getFilteredListings() {
   });
 }
 
-// Render chart and cards
+// Render chart, KPIs and cards instantaneously
 function renderFiltered() {
   const filtered = getFilteredListings();
-  document.getElementById('listings-count').textContent = filtered.length;
+
+  // Contadores instantâneos
+  const step2Count = document.getElementById('step-2-count');
+  if (step2Count) step2Count.textContent = filtered.length;
+
+  const listingsCount = document.getElementById('listings-count');
+  if (listingsCount) listingsCount.textContent = filtered.length;
+
+  // Recalcula KPIs em memória para a seleção filtrada
+  recalculateKPIs(filtered);
+
   renderPlotlyChart(filtered);
   renderListingsCards(filtered);
+
   if (window.lucide) {
     lucide.createIcons();
   }
 }
+
 
 // Render interactive Plotly Chart
 function renderPlotlyChart(listings) {
@@ -757,14 +882,12 @@ function escapeHtml(text) {
 }
 
 function resetScanButtons() {
-  const scanBtn = document.getElementById('btn-run-scan');
-  const toolbarBtn = document.getElementById('btn-toolbar-search');
-  const scanIcon = document.getElementById('scan-icon');
+  const updateDbBtn = document.getElementById('btn-update-db');
+  const updateDbIcon = document.getElementById('update-db-icon');
   const indicator = document.getElementById('scan-status-indicator');
 
-  if (scanBtn) scanBtn.disabled = false;
-  if (toolbarBtn) toolbarBtn.disabled = false;
-  if (scanIcon) scanIcon.classList.remove('animate-spin');
+  if (updateDbBtn) updateDbBtn.disabled = false;
+  if (updateDbIcon) updateDbIcon.classList.remove('animate-spin');
   if (indicator) {
     indicator.classList.add('hidden');
     indicator.classList.remove('flex');
@@ -840,22 +963,20 @@ function updateProgressUI(prog) {
   }
 }
 
-// Trigger live scraping with custom parameters
+// Trigger live scraping with custom parameters from Passo 1
 async function triggerScan() {
-  const maxPriceInput = document.getElementById('input-max-price');
+  const cityInput = document.getElementById('input-center-city');
   const radiusInput = document.getElementById('input-radius-km');
-  const maxPrice = maxPriceInput ? parseFloat(maxPriceInput.value) : null;
-  const radiusKm = radiusInput ? parseFloat(radiusInput.value) : null;
+  const centerCity = (cityInput ? cityInput.value : '').trim() || 'Veranópolis';
+  const radiusKm = radiusInput ? parseFloat(radiusInput.value) : 50;
 
-  const scanBtn = document.getElementById('btn-run-scan');
-  const toolbarBtn = document.getElementById('btn-toolbar-search');
-  const scanIcon = document.getElementById('scan-icon');
+  const updateDbBtn = document.getElementById('btn-update-db');
+  const updateDbIcon = document.getElementById('update-db-icon');
   const indicator = document.getElementById('scan-status-indicator');
   const progressPanel = document.getElementById('live-progress-panel');
 
-  if (scanBtn) scanBtn.disabled = true;
-  if (toolbarBtn) toolbarBtn.disabled = true;
-  if (scanIcon) scanIcon.classList.add('animate-spin');
+  if (updateDbBtn) updateDbBtn.disabled = true;
+  if (updateDbIcon) updateDbIcon.classList.add('animate-spin');
   if (indicator) {
     indicator.classList.remove('hidden');
     indicator.classList.add('flex');
@@ -876,7 +997,7 @@ async function triggerScan() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         live: true,
-        max_price: maxPrice,
+        center_city: centerCity,
         radius_km: radiusKm
       })
     });
@@ -896,14 +1017,12 @@ async function checkScanStatus() {
     const statusRes = await fetch('/api/scan/status');
     const status = await statusRes.json();
     if (status.is_scanning) {
-      const scanBtn = document.getElementById('btn-run-scan');
-      const toolbarBtn = document.getElementById('btn-toolbar-search');
-      const scanIcon = document.getElementById('scan-icon');
+      const updateDbBtn = document.getElementById('btn-update-db');
+      const updateDbIcon = document.getElementById('update-db-icon');
       const indicator = document.getElementById('scan-status-indicator');
 
-      if (scanBtn) scanBtn.disabled = true;
-      if (toolbarBtn) toolbarBtn.disabled = true;
-      if (scanIcon) scanIcon.classList.add('animate-spin');
+      if (updateDbBtn) updateDbBtn.disabled = true;
+      if (updateDbIcon) updateDbIcon.classList.add('animate-spin');
       if (indicator) {
         indicator.classList.remove('hidden');
         indicator.classList.add('flex');

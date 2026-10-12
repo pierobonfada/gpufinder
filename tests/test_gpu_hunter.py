@@ -34,11 +34,13 @@ def test_gpu_identification_nvidia_high_vram():
     assert res5[1] == 16
 
 def test_gpu_identification_rejections():
-    # 4060 Ti 8GB deve ser rejeitada (mínimo exigido é 16GB)
+    # Placas NVIDIA de qualquer VRAM são identificadas para alimentação do banco de dados completo
     res_8gb = identify_gpu("RTX 4060 Ti 8GB Gigabyte")
-    assert res_8gb is None
+    assert res_8gb is not None
+    assert res_8gb[0] == "RTX 4060 Ti"
+    assert res_8gb[1] == 8
 
-    # Placas AMD devem ser rejeitadas
+    # Placas não-NVIDIA (AMD Radeon) devem ser rejeitadas
     assert identify_gpu("Radeon RX 6800 XT 16GB") is None
     assert identify_gpu("AMD RX 7800 XT 16GB") is None
     assert identify_gpu("XFX RX 6900 XT 16GB") is None
@@ -149,3 +151,39 @@ def test_haversine_distance_veranopolis():
     in_rad_poa, dist_poa = is_within_radius("Porto Alegre", -28.9358, -51.5503, 40.0)
     assert in_rad_poa is False
     assert dist_poa > 100.0
+
+def test_vram_range_filter_and_cities():
+    from src.geo import get_all_known_cities
+    from src.engine import GPUHunterEngine
+
+    # Valida cidades conhecidas
+    cities = get_all_known_cities()
+    assert "Veranópolis" in cities or "Veranopolis" in cities
+    assert "Bento Gonçalves" in cities or "Bento Goncalves" in cities
+    assert "Caxias Do Sul" in cities or "Caxias do Sul" in [c.lower() for c in cities]
+    assert len(cities) >= 20
+
+    # Valida filtro em memória com range de VRAM
+    engine = GPUHunterEngine()
+    dummy_listings = [
+        GPUListing(id="1", title="RTX 3060 12GB", price=1800, platform="OLX", url="u1", detected_model="RTX 3060", detected_vram_gb=12),
+        GPUListing(id="2", title="RTX 4060 Ti 16GB", price=3200, platform="OLX", url="u2", detected_model="RTX 4060 Ti", detected_vram_gb=16),
+        GPUListing(id="3", title="RTX 3090 24GB", price=4500, platform="OLX", url="u3", detected_model="RTX 3090", detected_vram_gb=24),
+        GPUListing(id="4", title="Tesla V100 32GB", price=7000, platform="OLX", url="u4", detected_model="Tesla V100", detected_vram_gb=32),
+        GPUListing(id="5", title="RTX 3070 8GB", price=2000, platform="OLX", url="u5", detected_model="RTX 3070", detected_vram_gb=8),
+    ]
+
+    # Filtro padrão: 16 a 32 GB
+    f_16_32 = engine.filter_listings(dummy_listings, min_vram_gb=16, max_vram_gb=32)
+    assert len(f_16_32) == 3
+    assert {i.detected_vram_gb for i in f_16_32} == {16, 24, 32}
+
+    # Filtro: 8 a 16 GB
+    f_8_16 = engine.filter_listings(dummy_listings, min_vram_gb=8, max_vram_gb=16)
+    assert len(f_8_16) == 3
+    assert {i.detected_vram_gb for i in f_8_16} == {8, 12, 16}
+
+    # Filtro: Preço máximo R$ 4000
+    f_cheap = engine.filter_listings(dummy_listings, min_vram_gb=16, max_vram_gb=32, max_price=4000)
+    assert len(f_cheap) == 1
+    assert f_cheap[0].detected_model == "RTX 4060 Ti"
