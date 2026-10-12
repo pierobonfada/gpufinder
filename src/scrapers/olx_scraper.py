@@ -164,15 +164,15 @@ class OLXScraper(BaseScraper):
         seen_urls = set()
 
         urls_to_crawl = []
-        # 1. Busca ampla por termo regional (páginas 1 a max_pages)
-        for page in range(1, max_pages + 1):
-            urls_to_crawl.append(
-                f"https://www.olx.com.br/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q={encoded_q}&o={page}"
-            )
-        # 2. Categoria especializada de placas de vídeo na região
-        urls_to_crawl.append(
-            f"https://www.olx.com.br/informatica/placas-de-video/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q={encoded_q}"
-        )
+        # Categoria estrita e especializada de placas de vídeo na região de Caxias do Sul e Passo Fundo
+        # (NÃO pesquisa na raiz geral para não trazer PCs completos e notebooks)
+        search_terms = ["nvidia", "rtx", "geforce", "gtx"] if query == "nvidia" else [query]
+        for term in search_terms:
+            encoded_term = term.replace(" ", "%20")
+            for page in range(1, max_pages + 1):
+                urls_to_crawl.append(
+                    f"https://www.olx.com.br/informatica/placas-de-video/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q={encoded_term}&o={page}"
+                )
 
         try:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
@@ -219,8 +219,8 @@ class OLXScraper(BaseScraper):
                         ad["description"] = desc
                         await asyncio.sleep(0.2)
 
-                    # Identifica GPU e VRAM (qualquer placa NVIDIA)
-                    gpu_info = identify_gpu(title, desc)
+                    # Identifica GPU e VRAM (com validação estrita de placa avulsa, descartando PCs)
+                    gpu_info = identify_gpu(title, desc, ad.get("url", ""))
                     if not gpu_info:
                         continue
 
@@ -256,10 +256,10 @@ class OLXScraper(BaseScraper):
         return listings
 
     async def search_national(self, query: str) -> List[float]:
-        """Busca preços do modelo em todo o Brasil no OLX para benchmark estatístico."""
+        """Busca preços do modelo em todo o Brasil no OLX (especificamente placas-de-video) para benchmark estatístico."""
         prices: List[float] = []
         encoded_q = query.replace(" ", "%20")
-        url = f"https://www.olx.com.br/brasil?q={encoded_q}"
+        url = f"https://www.olx.com.br/informatica/placas-de-video?q={encoded_q}"
 
         try:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
@@ -274,8 +274,8 @@ class OLXScraper(BaseScraper):
                         p = ad.get("price", 0.0)
                         # Descarta preços absurdos ou simbólicos (< R$ 200 ou > R$ 15.000)
                         if 200.0 <= p <= 15000.0:
-                            # Confirma que é a GPU pesquisada
-                            info = identify_gpu(ad["title"], ad.get("description", ""))
+                            # Confirma que é a GPU pesquisada e NÃO um computador
+                            info = identify_gpu(ad["title"], ad.get("description", ""), ad.get("url", ""))
                             if info and info[0] == query:
                                 prices.append(p)
         except Exception as e:
@@ -288,7 +288,8 @@ class OLXScraper(BaseScraper):
         listings: List[GPUListing] = []
         seen_urls = set()
         
-        for q in queries:
+        search_terms = ["nvidia", "rtx", "geforce", "gtx"] if queries == ["nvidia"] else queries
+        for q in search_terms:
             encoded_q = q.replace(" ", "%20")
             for page in range(1, 3):
                 url = f"https://www.olx.com.br/informatica/placas-de-video/estado-rs?q={encoded_q}&o={page}"
@@ -308,6 +309,7 @@ class OLXScraper(BaseScraper):
                                 if price < 30.0:
                                     continue
 
+                                city = ad.get("city", "")
                                 # Filtra estritamente pelo raio geodésico
                                 in_radius, distance_km = self._matches_target_region(city)
                                 if not in_radius:
@@ -319,9 +321,10 @@ class OLXScraper(BaseScraper):
                                     ad["description"] = desc
                                     await asyncio.sleep(0.2)
 
-                                gpu_info = identify_gpu(title, desc)
+                                gpu_info = identify_gpu(title, desc, ad.get("url", ""))
                                 if not gpu_info:
                                     continue
+
                                 model_name, vram = gpu_info
                                 cond, reasons = self.defect_detector.analyze(title, desc)
 

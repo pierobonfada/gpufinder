@@ -15,82 +15,81 @@ CACHE_FILE = Path(__file__).resolve().parent.parent / "data" / "benchmark_cache.
 # Valores de referência nacional de mercado de seminovos/usados no Brasil
 # Atualizados dinamicamente pelo scraper nacional quando online
 DEFAULT_NATIONAL_BENCHMARKS: Dict[str, Dict] = {
-    "RTX 3090": {
-        "min": 3400.0, "median": 4200.0, "mean": 4290.0, "max": 5300.0,
-        "q1": 3800.0, "q3": 4650.0, "count": 28
-    },
-    "RTX 3090 Ti": {
-        "min": 4200.0, "median": 4850.0, "mean": 4920.0, "max": 5800.0,
-        "q1": 4500.0, "q3": 5300.0, "count": 14
-    },
-    "RTX 4080": {
-        "min": 5200.0, "median": 6200.0, "mean": 6150.0, "max": 7200.0,
-        "q1": 5600.0, "q3": 6700.0, "count": 22
-    },
-    "RTX 4070 Ti Super": {
-        "min": 4300.0, "median": 4850.0, "mean": 4890.0, "max": 5500.0,
-        "q1": 4600.0, "q3": 5150.0, "count": 18
-    },
-    "RTX 4060 Ti 16GB": {
-        "min": 2300.0, "median": 2750.0, "mean": 2780.0, "max": 3350.0,
-        "q1": 2550.0, "q3": 3000.0, "count": 35
-    },
-    "Titan RTX": {
-        "min": 3900.0, "median": 4700.0, "mean": 4800.0, "max": 5800.0,
-        "q1": 4300.0, "q3": 5250.0, "count": 8
-    },
-    "Tesla P40": {
-        "min": 1450.0, "median": 1950.0, "mean": 2010.0, "max": 2750.0,
-        "q1": 1700.0, "q3": 2300.0, "count": 19
-    },
-    "Tesla M40": {
-        "min": 850.0, "median": 1250.0, "mean": 1280.0, "max": 1750.0,
-        "q1": 1050.0, "q3": 1450.0, "count": 15
-    },
-    "Tesla K80": {
-        "min": 580.0, "median": 850.0, "mean": 890.0, "max": 1300.0,
-        "q1": 720.0, "q3": 1020.0, "count": 12
-    },
-    "Tesla V100": {
-        "min": 2900.0, "median": 3800.0, "mean": 3950.0, "max": 4900.0,
-        "q1": 3400.0, "q3": 4400.0, "count": 11
-    },
-    "Tesla T4": {
-        "min": 2100.0, "median": 2650.0, "mean": 2700.0, "max": 3400.0,
-        "q1": 2400.0, "q3": 2950.0, "count": 9
-    },
-    "Quadro P5000": {
-        "min": 1800.0, "median": 2350.0, "mean": 2400.0, "max": 3100.0,
-        "q1": 2100.0, "q3": 2700.0, "count": 14
-    },
-    "Quadro P6000": {
-        "min": 3300.0, "median": 4100.0, "mean": 4180.0, "max": 5100.0,
-        "q1": 3700.0, "q3": 4650.0, "count": 10
-    },
-    "Quadro M6000": {
-        "min": 2000.0, "median": 2600.0, "mean": 2680.0, "max": 3500.0,
-        "q1": 2300.0, "q3": 3050.0, "count": 7
-    },
-    "Quadro RTX 5000": {
-        "min": 2800.0, "median": 3500.0, "mean": 3580.0, "max": 4500.0,
-        "q1": 3150.0, "q3": 3950.0, "count": 13
-    },
-    "Quadro RTX 6000": {
-        "min": 4100.0, "median": 4950.0, "mean": 5100.0, "max": 6400.0,
-        "q1": 4550.0, "q3": 5600.0, "count": 9
-    },
-    "RTX A4000": {
-        "min": 3200.0, "median": 3850.0, "mean": 3920.0, "max": 4750.0,
-        "q1": 3550.0, "q3": 4300.0, "count": 16
-    },
-    "RTX A4500": {
-        "min": 4200.0, "median": 4950.0, "mean": 5050.0, "max": 6100.0,
-        "q1": 4600.0, "q3": 5500.0, "count": 6
-    },
-    "Quadro GV100": {
-        "min": 4500.0, "median": 5500.0, "mean": 5600.0, "max": 6800.0,
-        "q1": 4950.0, "q3": 6200.0, "count": 4
-    }
+    # --- RTX 50 Series ---
+    "RTX 5090": { "min": 15000.0, "median": 18500.0, "mean": 18900.0, "max": 23000.0, "q1": 17000.0, "q3": 20500.0, "count": 10 },
+    "RTX 5080": { "min": 8500.0, "median": 9800.0, "mean": 10000.0, "max": 12500.0, "q1": 9200.0, "q3": 10800.0, "count": 12 },
+    "RTX 5070 Ti": { "min": 6500.0, "median": 7400.0, "mean": 7500.0, "max": 8800.0, "q1": 6900.0, "q3": 8100.0, "count": 10 },
+    "RTX 5070": { "min": 4800.0, "median": 5600.0, "mean": 5700.0, "max": 6800.0, "q1": 5200.0, "q3": 6100.0, "count": 15 },
+
+    # --- RTX 40 Series ---
+    "RTX 4090": { "min": 9800.0, "median": 11800.0, "mean": 11950.0, "max": 14500.0, "q1": 10800.0, "q3": 12800.0, "count": 35 },
+    "RTX 4080 Super": { "min": 5800.0, "median": 6600.0, "mean": 6650.0, "max": 7800.0, "q1": 6200.0, "q3": 7100.0, "count": 25 },
+    "RTX 4080": { "min": 5200.0, "median": 6100.0, "mean": 6150.0, "max": 7200.0, "q1": 5600.0, "q3": 6600.0, "count": 30 },
+    "RTX 4070 Ti Super": { "min": 4400.0, "median": 4900.0, "mean": 4950.0, "max": 5800.0, "q1": 4650.0, "q3": 5300.0, "count": 28 },
+    "RTX 4070 Ti": { "min": 4000.0, "median": 4500.0, "mean": 4550.0, "max": 5300.0, "q1": 4250.0, "q3": 4800.0, "count": 26 },
+    "RTX 4070 Super": { "min": 3500.0, "median": 3950.0, "mean": 4000.0, "max": 4700.0, "q1": 3700.0, "q3": 4300.0, "count": 32 },
+    "RTX 4070": { "min": 2900.0, "median": 3400.0, "mean": 3450.0, "max": 4100.0, "q1": 3150.0, "q3": 3700.0, "count": 38 },
+    "RTX 4060 Ti 16GB": { "min": 2400.0, "median": 2750.0, "mean": 2780.0, "max": 3300.0, "q1": 2550.0, "q3": 2950.0, "count": 30 },
+    "RTX 4060 Ti": { "min": 2000.0, "median": 2350.0, "mean": 2380.0, "max": 2850.0, "q1": 2200.0, "q3": 2550.0, "count": 45 },
+    "RTX 4060": { "min": 1500.0, "median": 1800.0, "mean": 1820.0, "max": 2250.0, "q1": 1650.0, "q3": 1980.0, "count": 55 },
+
+    # --- RTX 30 Series ---
+    "RTX 3090 Ti": { "min": 4200.0, "median": 4850.0, "mean": 4920.0, "max": 5800.0, "q1": 4500.0, "q3": 5300.0, "count": 18 },
+    "RTX 3090": { "min": 3400.0, "median": 4200.0, "mean": 4250.0, "max": 5200.0, "q1": 3800.0, "q3": 4600.0, "count": 42 },
+    "RTX 3080 Ti": { "min": 2700.0, "median": 3150.0, "mean": 3200.0, "max": 3850.0, "q1": 2900.0, "q3": 3450.0, "count": 30 },
+    "RTX 3080 12GB": { "min": 2400.0, "median": 2800.0, "mean": 2850.0, "max": 3400.0, "q1": 2600.0, "q3": 3100.0, "count": 20 },
+    "RTX 3080": { "min": 2200.0, "median": 2650.0, "mean": 2680.0, "max": 3300.0, "q1": 2400.0, "q3": 2900.0, "count": 50 },
+    "RTX 3070 Ti": { "min": 1900.0, "median": 2250.0, "mean": 2280.0, "max": 2750.0, "q1": 2050.0, "q3": 2480.0, "count": 45 },
+    "RTX 3070": { "min": 1650.0, "median": 1950.0, "mean": 1980.0, "max": 2450.0, "q1": 1800.0, "q3": 2150.0, "count": 60 },
+    "RTX 3060 Ti": { "min": 1350.0, "median": 1650.0, "mean": 1680.0, "max": 2100.0, "q1": 1500.0, "q3": 1850.0, "count": 65 },
+    "RTX 3060": { "min": 1150.0, "median": 1400.0, "mean": 1430.0, "max": 1800.0, "q1": 1280.0, "q3": 1580.0, "count": 80 },
+    "RTX 3050": { "min": 850.0, "median": 1050.0, "mean": 1070.0, "max": 1350.0, "q1": 950.0, "q3": 1180.0, "count": 40 },
+
+    # --- RTX 20 Series ---
+    "RTX 2080 Ti": { "min": 1700.0, "median": 2100.0, "mean": 2150.0, "max": 2650.0, "q1": 1900.0, "q3": 2350.0, "count": 25 },
+    "RTX 2080 Super": { "min": 1400.0, "median": 1700.0, "mean": 1740.0, "max": 2150.0, "q1": 1550.0, "q3": 1900.0, "count": 22 },
+    "RTX 2080": { "min": 1250.0, "median": 1500.0, "mean": 1530.0, "max": 1900.0, "q1": 1380.0, "q3": 1680.0, "count": 28 },
+    "RTX 2070 Super": { "min": 1150.0, "median": 1400.0, "mean": 1420.0, "max": 1750.0, "q1": 1280.0, "q3": 1550.0, "count": 35 },
+    "RTX 2070": { "min": 1050.0, "median": 1250.0, "mean": 1270.0, "max": 1580.0, "q1": 1150.0, "q3": 1390.0, "count": 30 },
+    "RTX 2060 Super": { "min": 950.0, "median": 1150.0, "mean": 1180.0, "max": 1450.0, "q1": 1050.0, "q3": 1280.0, "count": 40 },
+    "RTX 2060": { "min": 780.0, "median": 950.0, "mean": 970.0, "max": 1250.0, "q1": 870.0, "q3": 1080.0, "count": 55 },
+
+    # --- GTX 16 Series ---
+    "GTX 1660 Ti": { "min": 650.0, "median": 780.0, "mean": 795.0, "max": 1000.0, "q1": 720.0, "q3": 870.0, "count": 32 },
+    "GTX 1660 Super": { "min": 620.0, "median": 750.0, "mean": 765.0, "max": 980.0, "q1": 690.0, "q3": 840.0, "count": 48 },
+    "GTX 1660": { "min": 550.0, "median": 680.0, "mean": 690.0, "max": 880.0, "q1": 610.0, "q3": 760.0, "count": 30 },
+    "GTX 1650 Super": { "min": 480.0, "median": 600.0, "mean": 615.0, "max": 780.0, "q1": 540.0, "q3": 680.0, "count": 28 },
+    "GTX 1650": { "min": 400.0, "median": 520.0, "mean": 530.0, "max": 690.0, "q1": 460.0, "q3": 590.0, "count": 50 },
+
+    # --- GTX 10 Series ---
+    "GTX 1080 Ti": { "min": 1050.0, "median": 1350.0, "mean": 1370.0, "max": 1750.0, "q1": 1200.0, "q3": 1520.0, "count": 24 },
+    "GTX 1080": { "min": 780.0, "median": 950.0, "mean": 970.0, "max": 1250.0, "q1": 870.0, "q3": 1080.0, "count": 30 },
+    "GTX 1070 Ti": { "min": 700.0, "median": 850.0, "mean": 870.0, "max": 1100.0, "q1": 780.0, "q3": 960.0, "count": 26 },
+    "GTX 1070": { "min": 600.0, "median": 750.0, "mean": 765.0, "max": 980.0, "q1": 680.0, "q3": 840.0, "count": 38 },
+    "GTX 1060 6GB": { "min": 480.0, "median": 580.0, "mean": 595.0, "max": 750.0, "q1": 530.0, "q3": 650.0, "count": 45 },
+    "GTX 1060": { "min": 420.0, "median": 520.0, "mean": 535.0, "max": 680.0, "q1": 470.0, "q3": 590.0, "count": 50 },
+    "GTX 1050 Ti": { "min": 320.0, "median": 420.0, "mean": 430.0, "max": 560.0, "q1": 370.0, "q3": 480.0, "count": 60 },
+    "GTX 1050": { "min": 250.0, "median": 340.0, "mean": 350.0, "max": 450.0, "q1": 290.0, "q3": 390.0, "count": 40 },
+    "GT 1030": { "min": 180.0, "median": 260.0, "mean": 270.0, "max": 380.0, "q1": 220.0, "q3": 310.0, "count": 35 },
+
+    # --- Clássicas e Profissionais / Datacenter ---
+    "GTX 980 Ti": { "min": 580.0, "median": 720.0, "mean": 740.0, "max": 950.0, "q1": 650.0, "q3": 820.0, "count": 15 },
+    "GTX 970": { "min": 350.0, "median": 450.0, "mean": 465.0, "max": 600.0, "q1": 400.0, "q3": 520.0, "count": 22 },
+    "GTX 750 Ti": { "min": 180.0, "median": 250.0, "mean": 260.0, "max": 350.0, "q1": 210.0, "q3": 290.0, "count": 30 },
+    "Titan RTX": { "min": 3900.0, "median": 4700.0, "mean": 4800.0, "max": 5800.0, "q1": 4300.0, "q3": 5250.0, "count": 8 },
+    "Tesla P40": { "min": 1450.0, "median": 1950.0, "mean": 2010.0, "max": 2750.0, "q1": 1700.0, "q3": 2300.0, "count": 19 },
+    "Tesla M40": { "min": 850.0, "median": 1250.0, "mean": 1280.0, "max": 1750.0, "q1": 1050.0, "q3": 1450.0, "count": 15 },
+    "Tesla K80": { "min": 580.0, "median": 850.0, "mean": 890.0, "max": 1300.0, "q1": 720.0, "q3": 1020.0, "count": 12 },
+    "Tesla V100": { "min": 2900.0, "median": 3800.0, "mean": 3950.0, "max": 4900.0, "q1": 3400.0, "q3": 4400.0, "count": 11 },
+    "Tesla T4": { "min": 2100.0, "median": 2650.0, "mean": 2700.0, "max": 3400.0, "q1": 2400.0, "q3": 2950.0, "count": 9 },
+    "Quadro P5000": { "min": 1800.0, "median": 2350.0, "mean": 2400.0, "max": 3100.0, "q1": 2100.0, "q3": 2700.0, "count": 14 },
+    "Quadro P6000": { "min": 3300.0, "median": 4100.0, "mean": 4180.0, "max": 5100.0, "q1": 3700.0, "q3": 4650.0, "count": 10 },
+    "Quadro M6000": { "min": 2000.0, "median": 2600.0, "mean": 2680.0, "max": 3500.0, "q1": 2300.0, "q3": 3050.0, "count": 7 },
+    "Quadro RTX 5000": { "min": 2800.0, "median": 3500.0, "mean": 3580.0, "max": 4500.0, "q1": 3150.0, "q3": 3950.0, "count": 13 },
+    "Quadro RTX 6000": { "min": 4100.0, "median": 4950.0, "mean": 5100.0, "max": 6400.0, "q1": 4550.0, "q3": 5600.0, "count": 9 },
+    "RTX A4000": { "min": 3200.0, "median": 3850.0, "mean": 3920.0, "max": 4750.0, "q1": 3550.0, "q3": 4300.0, "count": 16 },
+    "RTX A4500": { "min": 4200.0, "median": 4950.0, "mean": 5050.0, "max": 6100.0, "q1": 4600.0, "q3": 5500.0, "count": 6 },
+    "Quadro GV100": { "min": 4500.0, "median": 5500.0, "mean": 5600.0, "max": 6800.0, "q1": 4950.0, "q3": 6200.0, "count": 4 }
 }
 
 class BenchmarkEngine:
@@ -136,13 +135,34 @@ class BenchmarkEngine:
 
     def get_stats_for_model(self, model_name: str) -> Optional[NationalStats]:
         """Obtém estatísticas nacionais consolidadas para um modelo."""
+        if not model_name or model_name == "Desconhecido":
+            return None
+
+        # 1. Match exato
         if model_name in self.cache:
             return self.cache[model_name]
 
-        # Tenta casamento parcial
+        # 2. Match case-insensitive
         for k, v in self.cache.items():
-            if k.lower() in model_name.lower() or model_name.lower() in k.lower():
+            if k.lower() == model_name.lower():
                 return v
+
+        # 3. Match normalizado (sem espaços ou hífens)
+        import re
+        norm_input = re.sub(r'[^a-z0-9]', '', model_name.lower())
+        for k, v in self.cache.items():
+            if re.sub(r'[^a-z0-9]', '', k.lower()) == norm_input:
+                return v
+
+        # 4. Match estrito de sufixos (Ti e Super não podem colidir com modelos base)
+        has_ti = bool(re.search(r'\bti\b', model_name, re.I))
+        has_super = bool(re.search(r'\bsuper\b', model_name, re.I))
+        for k, v in self.cache.items():
+            k_has_ti = bool(re.search(r'\bti\b', k, re.I))
+            k_has_super = bool(re.search(r'\bsuper\b', k, re.I))
+            if has_ti == k_has_ti and has_super == k_has_super:
+                if k.lower() in model_name.lower() or model_name.lower() in k.lower():
+                    return v
 
         return None
 

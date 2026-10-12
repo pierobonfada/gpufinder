@@ -314,12 +314,12 @@ function recalculateKPIs(filtered) {
     if (lowestDescEl) lowestDescEl.textContent = '-';
   }
 
-  // Melhor Oportunidade: placa funcional com maior desconto vs mediana nacional
+  // Melhor Oportunidade: placa funcional com maior desconto vs mediana nacional (APENAS se for mais barata que a média)
   let bestDealItem = null;
-  let bestDiff = 99999;
+  let bestDiff = -5.0; // Pelo menos 5% de desconto para qualificar como oportunidade
   for (const item of (workingItems.length > 0 ? workingItems : filtered)) {
     if (item.price_diff_percent !== null && item.price_diff_percent !== undefined) {
-      if (item.price_diff_percent < bestDiff) {
+      if (item.price_diff_percent <= bestDiff) {
         bestDiff = item.price_diff_percent;
         bestDealItem = item;
       }
@@ -332,13 +332,34 @@ function recalculateKPIs(filtered) {
   const cardBestDeal = document.getElementById('card-kpi-best-deal');
 
   if (bestDealItem) {
-    if (bestPriceEl) bestPriceEl.textContent = formatBRL(bestDealItem.price);
+    if (bestPriceEl) {
+      bestPriceEl.textContent = formatBRL(bestDealItem.price);
+      bestPriceEl.className = 'text-2xl font-bold text-emerald-400 group-hover:text-emerald-300 transition';
+    }
     const diffPct = bestDealItem.price_diff_percent || 0;
-    if (bestDiffEl) bestDiffEl.textContent = `${bestDealItem.detected_model} (${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}% vs Brasil)`;
-    if (cardBestDeal) cardBestDeal.setAttribute('title', `Clique para abrir o anúncio de ${bestDealItem.detected_model} na ${bestDealItem.platform}`);
+    if (bestDiffEl) {
+      bestDiffEl.textContent = `${bestDealItem.detected_model} (${diffPct.toFixed(0)}% vs Brasil)`;
+      bestDiffEl.className = 'text-xs text-emerald-300 font-medium truncate';
+    }
+    if (cardBestDeal) {
+      cardBestDeal.setAttribute('title', `Clique para abrir o anúncio de ${bestDealItem.detected_model} na ${bestDealItem.platform}`);
+      cardBestDeal.classList.add('cursor-pointer');
+      cardBestDeal.classList.remove('opacity-60', 'cursor-default');
+    }
   } else {
-    if (bestPriceEl) bestPriceEl.textContent = 'R$ 0';
-    if (bestDiffEl) bestDiffEl.textContent = 'vs Mediana Brasil';
+    if (bestPriceEl) {
+      bestPriceEl.textContent = 'R$ --';
+      bestPriceEl.className = 'text-2xl font-bold text-slate-400 transition';
+    }
+    if (bestDiffEl) {
+      bestDiffEl.textContent = 'Nenhuma abaixo da média';
+      bestDiffEl.className = 'text-xs text-slate-400 font-medium truncate';
+    }
+    if (cardBestDeal) {
+      cardBestDeal.removeAttribute('title');
+      cardBestDeal.classList.remove('cursor-pointer');
+      cardBestDeal.classList.add('cursor-default');
+    }
   }
 }
 

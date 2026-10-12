@@ -364,25 +364,89 @@ def is_non_nvidia(text: str) -> bool:
                 return True
     return False
 
+MODEL_VALID_VRAMS: Dict[str, List[int]] = {
+    # RTX 50
+    "RTX 5090": [32], "RTX 5080": [16], "RTX 5070 Ti": [16], "RTX 5070": [12],
+    # RTX 40
+    "RTX 4090": [24], "RTX 4080 Super": [16], "RTX 4080": [16], "RTX 4070 Ti Super": [16],
+    "RTX 4070 Ti": [12], "RTX 4070 Super": [12], "RTX 4070": [12], "RTX 4060 Ti 16GB": [16],
+    "RTX 4060 Ti": [8, 16], "RTX 4060": [8],
+    # RTX 30
+    "RTX 3090 Ti": [24], "RTX 3090": [24], "RTX 3080 Ti": [12], "RTX 3080": [10, 12],
+    "RTX 3070 Ti": [8], "RTX 3070": [8], "RTX 3060 Ti": [8], "RTX 3060": [8, 12],
+    "RTX 3050": [6, 8],
+    # RTX 20
+    "RTX 2080 Ti": [11], "RTX 2080 Super": [8], "RTX 2080": [8], "RTX 2070 Super": [8],
+    "RTX 2070": [8], "RTX 2060 Super": [8], "RTX 2060": [6, 12], "RTX 2050": [4],
+    # GTX 16
+    "GTX 1660 Ti": [6], "GTX 1660 Super": [6], "GTX 1660": [6],
+    "GTX 1650 Super": [4], "GTX 1650": [4],
+    # GTX 10
+    "GTX 1080 Ti": [11], "GTX 1080": [8], "GTX 1070 Ti": [8], "GTX 1070": [8],
+    "GTX 1060": [3, 6], "GTX 1050 Ti": [4], "GTX 1050": [2, 3],
+    # GTX 900
+    "GTX 980 Ti": [6], "GTX 980": [4], "GTX 970": [4], "GTX 960": [2, 4], "GTX 950": [2],
+    # GTX 700 / 600 / 500
+    "GTX 780 Ti": [3], "GTX 780": [3, 6], "GTX 770": [2, 4], "GTX 760": [2, 4],
+    "GTX 750 Ti": [2, 4], "GTX 750": [1, 2], "GTX 680": [2, 4], "GTX 670": [2, 4], "GTX 660": [2, 3],
+    "GTX 580": [1, 3], "GTX 570": [1], "GTX 560": [1, 2], "GTX 550 Ti": [1, 2],
+    # GT Series
+    "GT 1030": [2], "GT 730": [2, 4], "GT 710": [1, 2], "GeForce 6200": [0],
+    # Workstation / Tesla
+    "Titan RTX": [24], "Titan V": [12], "Titan Xp": [12], "Titan X": [12],
+    "Quadro RTX 8000": [48], "Quadro RTX 6000": [24], "Quadro RTX 5000": [16], "Quadro RTX 4000": [8],
+    "Quadro P6000": [24], "Quadro P5000": [16], "Quadro P4000": [8], "Quadro P2200": [5],
+    "Quadro P2000": [5], "Quadro P1000": [4], "Quadro P600": [2], "Quadro P400": [2],
+    "Quadro K5200": [8], "Quadro K4200": [4], "Quadro K2200": [4], "Quadro K2000": [2],
+    "Quadro 4000": [2], "Quadro 2000": [1], "Quadro 600": [1],
+    "Tesla V100": [16, 32], "Tesla P40": [24], "Tesla P100": [12, 16], "Tesla M40": [12, 24],
+    "Tesla K80": [24], "Tesla T4": [16],
+    "RTX A6000": [48], "RTX A5000": [24], "RTX A4500": [20], "RTX A4000": [16], "RTX 4000 Ada": [20]
+}
+
 def extract_explicit_vram(text: str) -> Optional[int]:
-    """Extrai valor explícito de VRAM em GB a partir do texto."""
+    """
+    Extrai valor explícito de VRAM em GB a partir do texto.
+    Filtra e ignora completamente menções a memória RAM do computador (ex: 16GB RAM, 32GB RAM).
+    """
     text_lower = text.lower()
-    # Padrões comuns: '16gb', '24 gb', '8gb vram', '12g', '2gb'
-    matches = re.findall(r"\b(1|2|3|4|5|6|8|10|11|12|16|20|24|32|48)\s*(?:gb|g\b|gigas?)\b", text_lower)
+
+    # 1. Limpa menções óbvias de memória RAM de sistema para não confundir com VRAM
+    cleaned = re.sub(r"\b\d+\s*gb\s*(?:de\s+)?ram\b", "", text_lower)
+    cleaned = re.sub(r"\b\d+\s*gbram\b", "", cleaned)
+    cleaned = re.sub(r"\bmem[oó]ria\s+ram\b", "", cleaned)
+    cleaned = re.sub(r"\bddr[345]\s+\d+\s*gb\b", "", cleaned)
+
+    # 2. Busca menção explícita de memória de vídeo (VRAM, GDDR)
+    vram_matches = re.findall(r"\b(1|2|3|4|5|6|8|10|11|12|16|20|24|32|48)\s*(?:gb|g)\s*(?:vram|gddr[56]x?|de\s+vram)\b", cleaned)
+    if vram_matches:
+        return int(vram_matches[0])
+
+    # 3. Padrões comuns gerais de memória gráfica no texto limpo
+    matches = re.findall(r"\b(1|2|3|4|5|6|8|10|11|12|16|20|24|32|48)\s*(?:gb|g\b|gigas?)\b", cleaned)
     if matches:
         nums = [int(m) for m in matches]
-        # Dá prioridade para números comuns de placas de vídeo
+        # Dá prioridade para números válidos
         for n in nums:
-            if n in [24, 32, 16, 20, 12, 10, 11, 8, 6, 4, 3, 2, 1]:
+            if n in [24, 16, 20, 12, 10, 11, 8, 6, 4, 3, 2, 1]:
                 return n
         return nums[0]
+
     return None
 
-def identify_gpu(title: str, description: str = "") -> Optional[Tuple[str, int]]:
+def identify_gpu(title: str, description: str = "", url: str = "") -> Optional[Tuple[str, int]]:
     """
-    Identifica QUALQUER GPU NVIDIA presente no anúncio e sua memória VRAM.
-    Retorna uma tupla (nome_do_modelo, vram_em_gb) ou None se não for NVIDIA.
+    Identifica QUALQUER GPU NVIDIA presente no anúncio e sua memória VRAM física real.
+    Descarta automaticamente computadores completos, notebooks e kits (exclusivo para placas de vídeo).
+    Garante que a VRAM seja fisicamente válida para o modelo identificado.
     """
+    from src.hardware_classifier import is_standalone_gpu
+
+    # 1. Classificação prévia: DEVE ser placa de vídeo avulsa
+    is_gpu, reason = is_standalone_gpu(title, description, url)
+    if not is_gpu:
+        return None
+
     full_text = f"{title} {description}".lower()
 
     if is_non_nvidia(full_text):
@@ -390,7 +454,7 @@ def identify_gpu(title: str, description: str = "") -> Optional[Tuple[str, int]]
 
     explicit_vram = extract_explicit_vram(full_text)
 
-    # 1. Busca por modelos conhecidos no catálogo
+    # 2. Busca por modelos conhecidos no catálogo
     for model_name, info in NVIDIA_GPU_CATALOG.items():
         matched = False
         for kw in info["keywords"]:
@@ -405,15 +469,22 @@ def identify_gpu(title: str, description: str = "") -> Optional[Tuple[str, int]]
             if any(exc in full_text for exc in info["exclude"]):
                 continue
 
-        # VRAM determinada: se o texto traz menção explícita de VRAM coerente, usa ela
-        vram = explicit_vram if (explicit_vram and explicit_vram in [1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 16, 20, 24, 32, 48]) else info["default_vram"]
+        # VALIDAÇÃO FÍSICA ESTRITA DE VRAM:
+        # A VRAM só é aceita se for uma das configurações de fábrica válidas daquele modelo!
+        # Se o texto mencionar um valor absurdo (ex: 32GB para uma RTX 4060), rejeita e usa o padrão de 8GB.
+        valid_vrams = MODEL_VALID_VRAMS.get(model_name, [info["default_vram"]])
+        if explicit_vram and explicit_vram in valid_vrams:
+            vram = explicit_vram
+        else:
+            vram = info["default_vram"]
+
         return (model_name, vram)
 
-    # 2. Verificação genérica: título menciona "NVIDIA", "GeForce", "RTX", "GTX", "Quadro", "Tesla"
+    # 3. Verificação genérica: título menciona "NVIDIA", "GeForce", "RTX", "GTX", "Quadro", "Tesla"
     if re.search(r"\b(rtx|gtx|nvidia|quadro|tesla|titan|geforce)\b", full_text):
         match = re.search(r"\b((?:geforce\s+)?(?:rtx|gtx|gt)\s*\d{3,4}(?:\s*ti)?(?:\s*super)?|quadro\s*[a-z0-9]+|tesla\s*[a-z0-9]+|titan\s*[a-z0-9]+)\b", full_text)
         detected_name = match.group(0).upper() if match else "NVIDIA GPU"
-        vram = explicit_vram if explicit_vram else 8
+        vram = explicit_vram if (explicit_vram and explicit_vram in [1, 2, 3, 4, 6, 8, 10, 11, 12, 16, 24]) else 8
         return (detected_name, vram)
 
     return None

@@ -187,3 +187,97 @@ def test_vram_range_filter_and_cities():
     f_cheap = engine.filter_listings(dummy_listings, min_vram_gb=16, max_vram_gb=32, max_price=4000)
     assert len(f_cheap) == 1
     assert f_cheap[0].detected_model == "RTX 4060 Ti"
+
+def test_pc_gamer_and_notebook_rejections():
+    # PCs, Notebooks e setups completos devem ser 100% rejeitados
+    assert identify_gpu("PC Gamer i7 10700k RTX 3060 16GB RAM 512GB SSD") is None
+    assert identify_gpu("Notebook Gamer Dell G15 RTX 3050 16GB") is None
+    assert identify_gpu("Setup Completo Ryzen 5 5600X RTX 4060 32GB RAM") is None
+    assert identify_gpu("Computador Gamer i5 RTX 2060 16GB RAM Gabinete Aquario") is None
+    assert identify_gpu("Gabinete Gamer com placa de video GTX 1660") is None
+    assert identify_gpu("Kit Upgrade Ryzen 7 + RTX 3070") is None
+
+    # Anúncios em categorias de computadores ou notebooks
+    assert identify_gpu(
+        "RTX 3060 em ótimo estado",
+        description="Vendo placa",
+        url="https://rs.olx.com.br/regioes/computadores-e-desktops/rtx-3060-12345"
+    ) is None
+    assert identify_gpu(
+        "RTX 4060",
+        description="Vendo notebook",
+        url="https://rs.olx.com.br/regioes/notebooks/rtx-4060-12345"
+    ) is None
+
+def test_standalone_gpu_acceptance_and_ram_not_vram():
+    # Placas de vídeo avulsas devem ser aceitas com sucesso
+    res1 = identify_gpu("Placa de Vídeo RTX 4060 8GB Gigabyte Eagle")
+    assert res1 is not None
+    assert res1[0] == "RTX 4060"
+    assert res1[1] == 8
+
+    res2 = identify_gpu("Placa de Vídeo Galax GeForce RTX 4060 8GB GDDR6")
+    assert res2 is not None
+    assert res2[0] == "RTX 4060"
+    assert res2[1] == 8
+
+    res3 = identify_gpu("Placa de Vídeo RTX 3060 12GB Asus Dual")
+    assert res3 is not None
+    assert res3[0] == "RTX 3060"
+    assert res3[1] == 12
+
+    # Menção de memória RAM do PC não pode contaminar a VRAM da placa
+    res4 = identify_gpu("Placa de Vídeo RTX 4060", description="Vendo minha placa de vídeo, rodava em PC com 32GB de RAM")
+    assert res4 is not None
+    assert res4[0] == "RTX 4060"
+    assert res4[1] == 8  # RTX 4060 só existe com 8GB de VRAM, 32GB RAM foi ignorado!
+
+def test_best_deal_only_discounts():
+    from src.engine import GPUHunterEngine
+    from src.models import GPUCondition, GPUListing
+
+    engine = GPUHunterEngine()
+
+    # Cenário 1: Todas as placas estão mais caras que a média (+20%, +75%)
+    # "Melhor Oportunidade" NÃO DEVE existir (deve ser None)!
+    expensive_listings = [
+        GPUListing(id="e1", title="RTX 3060", price=2500, platform="OLX", url="u1",
+                   condition=GPUCondition.WORKING, price_diff_percent=78.5),
+        GPUListing(id="e2", title="RTX 4060", price=2300, platform="OLX", url="u2",
+                   condition=GPUCondition.WORKING, price_diff_percent=27.7),
+    ]
+    summary1 = engine.calculate_summary(expensive_listings)
+    assert summary1.best_deal is None, "Nenhuma placa com ágio deve ser marcada como Melhor Oportunidade!"
+
+    # Cenário 2: Uma placa com -25% de desconto real vs mediana nacional
+    deal_listings = [
+        GPUListing(id="d1", title="RTX 3060 Oportunidade", price=1050, platform="OLX", url="u1",
+                   condition=GPUCondition.WORKING, price_diff_percent=-25.0),
+        GPUListing(id="e2", title="RTX 4060 Cara", price=2300, platform="OLX", url="u2",
+                   condition=GPUCondition.WORKING, price_diff_percent=27.7),
+    ]
+    summary2 = engine.calculate_summary(deal_listings)
+    assert summary2.best_deal is not None
+    assert summary2.best_deal.id == "d1"
+    assert summary2.best_deal.price_diff_percent == -25.0
+
+def test_benchmark_strict_model_matching():
+    config = AppConfig()
+    engine = BenchmarkEngine(config.national_benchmark)
+
+    # RTX 3060 vs RTX 3060 Ti
+    stats_3060 = engine.get_stats_for_model("RTX 3060")
+    stats_3060_ti = engine.get_stats_for_model("RTX 3060 Ti")
+
+    assert stats_3060 is not None
+    assert stats_3060_ti is not None
+    assert stats_3060.model_name == "RTX 3060"
+    assert stats_3060_ti.model_name == "RTX 3060 Ti"
+    assert stats_3060.median_price == 1400.0
+    assert stats_3060_ti.median_price == 1650.0
+
+    # RTX 4060 vs RTX 4060 Ti 16GB
+    stats_4060 = engine.get_stats_for_model("RTX 4060")
+    stats_4060_ti_16 = engine.get_stats_for_model("RTX 4060 Ti 16GB")
+    assert stats_4060.median_price == 1800.0
+    assert stats_4060_ti_16.median_price == 2750.0

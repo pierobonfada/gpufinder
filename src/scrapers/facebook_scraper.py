@@ -187,8 +187,18 @@ class FacebookMarketplaceScraper(BaseScraper):
                         if not in_radius:
                             continue
 
-                        # 3. Identificação de GPU NVIDIA e VRAM (qualquer placa NVIDIA)
-                        gpu_info = identify_gpu(title_val, text_content)
+                        href = await el.query_selector("a")
+                        href_val = ""
+                        if href:
+                            href_val = await href.get_attribute("href") or ""
+                        elif await el.get_attribute("href"):
+                            href_val = await el.get_attribute("href") or ""
+
+                        if href_val and not href_val.startswith("http"):
+                            href_val = f"https://www.facebook.com{href_val}"
+
+                        # 3. Identificação de GPU NVIDIA e VRAM (descartando PCs e notebooks)
+                        gpu_info = identify_gpu(title_val, text_content, href_val)
                         if not gpu_info:
                             continue
 
@@ -198,21 +208,18 @@ class FacebookMarketplaceScraper(BaseScraper):
                         img_el = await el.query_selector("img")
                         img_src = await img_el.get_attribute("src") if img_el else ""
 
-                        href = await el.get_attribute("href") or ""
-                        if href and not href.startswith("http"):
-                            href = f"https://www.facebook.com{href}"
 
                         # 5. Detecção de defeito / peças
                         cond, reasons = self.defect_detector.analyze(title_val, text_content)
 
-                        item_id = f"fb_{re.sub(r'[^a-zA-Z0-9]', '', href)[-16:]}" if href else f"fb_{len(listings)}"
+                        item_id = f"fb_{re.sub(r'[^a-zA-Z0-9]', '', href_val)[-16:]}" if href_val else f"fb_{len(listings)}"
 
                         listing = GPUListing(
                             id=item_id,
                             title=title_val,
                             price=price_val,
                             platform="Facebook",
-                            url=href,
+                            url=href_val,
                             image_url=img_src,
                             city=loc_val or self.config.location.center_city,
                             state="RS",

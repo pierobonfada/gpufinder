@@ -76,12 +76,10 @@ class GPUHunterEngine:
 
         best_deal = None
         working_with_benchmark = [
-            i for i in working if i.price_diff_percent is not None and i.price_diff_percent < 0
+            i for i in working if i.price_diff_percent is not None and i.price_diff_percent <= -5.0
         ]
         if working_with_benchmark:
             best_deal = min(working_with_benchmark, key=lambda x: x.price_diff_percent)
-        elif working:
-            best_deal = min(working, key=lambda x: x.price)
 
         return ScanSummary(
             total_found=len(clean),
