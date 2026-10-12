@@ -10,8 +10,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.config import AppConfig, load_config, save_config
+from src.defect_detector import DefectDetector
 from src.engine import GPUHunterEngine
-from src.models import GPUListing, GPUCondition, PriceClassification, ScanSummary
+from src.models import GPUListing, GPUCondition, PriceClassification, ScanSummary, ScanProgress
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +35,11 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 engine = GPUHunterEngine()
 
-# Inicializa banco de dados com varredura local inicial se vazio
 @app.on_event("startup")
 async def startup_event():
+    # Carrega dados reais existentes se houver
     existing = engine.load_listings_from_disk()
-    if not existing:
-        logger.info("Base de dados vazia. Inicializando dados de catálogo da Serra Gaúcha...")
-        await engine.run_scan(include_live_scrapers=False)
+    logger.info(f"GPU Hunter iniciado. Anúncios reais na base: {len(existing)}")
 
 @app.get("/")
 async def get_index():
@@ -56,10 +55,6 @@ async def get_listings(
     outlier_only: bool = Query(False, description="Apenas outliers")
 ):
     items = engine.load_listings_from_disk()
-    if not items:
-        # Se vazio, inicializa
-        await engine.run_scan(include_live_scrapers=False)
-        items = engine.load_listings_from_disk()
 
     filtered = items
     if vram:
@@ -101,12 +96,36 @@ async def update_config(new_config: AppConfig):
 async def get_scan_status():
     return {"is_scanning": engine.is_scanning}
 
+@app.get("/api/scan/progress", response_model=ScanProgress)
+async def get_scan_progress():
+    return engine.progress
+
+class ScanRequestPayload(BaseModel):
+    live: bool = True
+    max_price: Optional[float] = None
+    radius_km: Optional[float] = None
+
 @app.post("/api/scan")
-async def trigger_scan(background_tasks: BackgroundTasks, live: bool = Query(True)):
+async def trigger_scan(
+    background_tasks: BackgroundTasks,
+    live: bool = Query(True),
+    max_price: Optional[float] = Query(None),
+    radius_km: Optional[float] = Query(None),
+    payload: Optional[ScanRequestPayload] = None
+):
     if engine.is_scanning:
         return {"status": "busy", "message": "Uma varredura já está em andamento."}
 
-    background_tasks.add_task(engine.run_scan, include_live_scrapers=live)
+    req_live = payload.live if payload and payload.live is not None else live
+    req_max_price = payload.max_price if payload and payload.max_price is not None else max_price
+    req_radius_km = payload.radius_km if payload and payload.radius_km is not None else radius_km
+
+    background_tasks.add_task(
+        engine.run_scan,
+        include_live_scrapers=req_live,
+        custom_max_price=req_max_price,
+        custom_radius_km=req_radius_km
+    )
     return {"status": "started", "message": "Varredura iniciada em segundo plano."}
 
 @app.get("/api/benchmark/{model_name}")

@@ -82,6 +82,12 @@ NVIDIA_HIGH_VRAM_CATALOG: Dict[str, Dict] = {
         "keywords": ["tesla t4", "nvidia t4", "t4 16gb"],
         "architecture": "Turing"
     },
+    "Tesla P100": {
+        "series": "Tesla / Data Center",
+        "default_vram": 16,
+        "keywords": ["tesla p100", "p100 16gb", "nvidia p100", "p100 hbm2"],
+        "architecture": "Pascal"
+    },
 
     # --- Série Profissional Quadro / RTX Workstation ---
     "Quadro RTX 5000": {
@@ -231,9 +237,24 @@ def identify_gpu(title: str, description: str = "") -> Optional[Tuple[str, int]]
         return (model_name, vram)
 
     # 2. Verificação genérica: título menciona "NVIDIA" ou "GeForce" ou "RTX" e tem 16GB a 32GB
+    # Descarta se "16gb" ou "32gb" for claramente memória RAM do computador (ex: "32gb ram", "16gb ddr")
+    if re.search(r"\b(16|24|32)\s*(?:gb)?\s*(?:de\s+)?(?:ram|ddr[45]|memoria\s+ram)\b", full_text):
+        # Apenas aceita se também houver menção separada de VRAM ou modelo que tenha 16GB+
+        return None
+
+    # Descarta placas que sabidamente têm menos de 16GB de VRAM
+    # (3050=8GB, 3060=12GB, 3060 Ti=8GB, 3070/Ti=8GB, 3080/Ti=10-12GB, 4060 normal=8GB, 4070 normal/super=12GB)
+    if re.search(r"\b(?:rtx\s*3050|rtx\s*3060(?:\s*ti)?|rtx\s*3070(?:\s*ti)?|rtx\s*3080(?:\s*ti)?|rtx\s*4060(?!\s*ti\s*(?:16|16gb))|rtx\s*4070(?!\s*ti\s*super)|gtx\s*\d{3,4})\b", full_text):
+        return None
+
+    # Se for anúncio de PC Gamer / Desktop completo, a menção de '16gb' ou '32gb' é tipicamente RAM do sistema,
+    # a menos que a placa de vídeo seja explicitamente uma do catálogo de 16GB+
+    if re.search(r"\b(?:pc\s*gamer|computador|desktop|gabinete|setup|i[3579]|ryzen)\b", full_text):
+        if not any(k in full_text for k in ["3090", "4080", "4090", "4070 ti super", "4060 ti 16", "tesla", "quadro", "a4000", "a5000"]):
+            return None
+
     if re.search(r"\b(rtx|gtx|nvidia|quadro|tesla|titan)\b", full_text):
         if explicit_vram and 16 <= explicit_vram <= 32:
-            # Tenta inferir nome
             match = re.search(r"\b(rtx\s*\d{4}(?:\s*ti)?(?:\s*super)?|quadro\s*[a-z0-9]+|tesla\s*[a-z0-9]+)\b", full_text)
             detected_name = match.group(0).upper() if match else f"NVIDIA {explicit_vram}GB"
             return (detected_name, explicit_vram)

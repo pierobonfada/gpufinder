@@ -53,6 +53,9 @@ class GPUListing(BaseModel):
     price_classification: PriceClassification = PriceClassification.UNKNOWN
     price_diff_percent: Optional[float] = None  # Diferença % vs mediana nacional
     price_diff_brl: Optional[float] = None      # Diferença R$ vs mediana nacional
+    compute_tflops: Optional[float] = None      # Capacidade Computacional FP32 em Teraflops (NVIDIA/TechPowerUp)
+    memory_bandwidth_gbs: Optional[float] = None# Largura de banda da memória em GB/s
+    architecture: Optional[str] = None          # Arquitetura (ex: Pascal, Ampere, Ada Lovelace)
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     description: Optional[str] = None
 
@@ -67,3 +70,13 @@ class ScanSummary(BaseModel):
     best_deal: Optional[GPUListing] = None
     lowest_item: Optional[GPUListing] = None
     scanned_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+class ScanProgress(BaseModel):
+    is_scanning: bool = False
+    current_task: str = "Aguardando início..."
+    current_step: int = 0
+    total_steps: int = 0
+    found_count: int = 0
+    logs: List[str] = Field(default_factory=list)
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None

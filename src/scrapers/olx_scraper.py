@@ -238,3 +238,52 @@ class OLXScraper(BaseScraper):
             logger.debug(f"Erro no benchmark nacional OLX para '{query}': {e}")
 
         return prices
+
+    async def search_state_rs(self, queries: List[str]) -> List[GPUListing]:
+        """Varre a categoria especializada de informática/placas-de-video no Rio Grande do Sul."""
+        listings: List[GPUListing] = []
+        for q in queries:
+            encoded_q = q.replace(" ", "%20")
+            url = f"https://www.olx.com.br/informatica/placas-de-video/estado-rs?q={encoded_q}"
+            try:
+                async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                    resp = await client.get(url, headers=self.headers)
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, "lxml")
+                        raw_ads = self._extract_from_html(soup)
+                        for ad in raw_ads:
+                            title = ad["title"]
+                            price = ad["price"]
+                            city = ad["city"]
+                            gpu_info = identify_gpu(title, ad.get("description", ""))
+                            if not gpu_info:
+                                continue
+                            model_name, vram = gpu_info
+                            if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
+                                continue
+                            cond, reasons = self.defect_detector.analyze(title, ad.get("description", ""))
+                            from src.geo import get_city_distance_from_center
+                            dist = get_city_distance_from_center(city)
+                            listing_id = f"olx_{re.sub(r'[^a-zA-Z0-9]', '', ad['url'])[-16:]}" if ad["url"] else f"olx_{len(listings)}"
+                            item = GPUListing(
+                                id=listing_id,
+                                title=title,
+                                price=price,
+                                platform="OLX",
+                                url=ad["url"],
+                                image_url=ad.get("image_url") or "",
+                                city=city,
+                                state="RS",
+                                distance_km=dist,
+                                raw_location=city,
+                                detected_model=model_name,
+                                detected_vram_gb=vram,
+                                condition=cond,
+                                defect_reasons=reasons,
+                                description=ad.get("description", "")
+                            )
+                            listings.append(item)
+            except Exception as e:
+                logger.debug(f"Erro ao buscar no OLX RS ({q}): {e}")
+            await asyncio.sleep(0.3)
+        return listings

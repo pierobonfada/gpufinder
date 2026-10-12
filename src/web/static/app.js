@@ -17,19 +17,9 @@ const formatBRL = (val) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 };
 
-// Retorna URL efetiva do anúncio.
-// Para anúncios reais, usa a URL direta. Para itens de demonstração regional inicial (sample_),
-// redireciona para a busca ao vivo daquele modelo na respectiva plataforma para evitar links inexistentes.
+// Retorna URL direta do anúncio real
 const getEffectiveListingUrl = (item) => {
   if (!item) return '#';
-  if (item.id && item.id.startsWith('sample_')) {
-    const model = encodeURIComponent(item.detected_model || 'NVIDIA RTX');
-    if ((item.platform || '').toLowerCase().includes('facebook')) {
-      return `https://www.facebook.com/marketplace/search/?query=${model}`;
-    } else {
-      return `https://www.olx.com.br/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q=${model}`;
-    }
-  }
   return item.url || '#';
 };
 
@@ -48,10 +38,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupEventListeners() {
   // Search input
   const searchInput = document.getElementById('filter-search');
-  searchInput.addEventListener('input', (e) => {
-    activeFilters.search = e.target.value.toLowerCase().trim();
-    renderFiltered();
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      activeFilters.search = e.target.value.toLowerCase().trim();
+      renderFiltered();
+    });
+  }
 
   // VRAM buttons
   document.querySelectorAll('.vram-filter-btn').forEach(btn => {
@@ -93,23 +85,47 @@ function setupEventListeners() {
     });
   });
 
-  // Price slider
-  const slider = document.getElementById('price-slider');
-  const sliderVal = document.getElementById('price-slider-val');
-  slider.addEventListener('input', (e) => {
-    activeFilters.maxPrice = parseFloat(e.target.value);
-    sliderVal.textContent = formatBRL(activeFilters.maxPrice);
-    renderFiltered();
-  });
+  // Editable Max Price (Sem teto fixo)
+  const priceInput = document.getElementById('input-max-price');
+  if (priceInput) {
+    priceInput.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      activeFilters.maxPrice = (!isNaN(val) && val > 0) ? val : 99999999;
+      renderFiltered();
+    });
+  }
+
+  // Search button inside toolbar
+  const toolbarSearchBtn = document.getElementById('btn-toolbar-search');
+  if (toolbarSearchBtn) {
+    toolbarSearchBtn.addEventListener('click', triggerScan);
+  }
 
   // Outliers only checkbox
-  document.getElementById('chk-outliers-only').addEventListener('change', (e) => {
-    activeFilters.outliersOnly = e.target.checked;
-    renderFiltered();
-  });
+  const chkOutliers = document.getElementById('chk-outliers-only');
+  if (chkOutliers) {
+    chkOutliers.addEventListener('change', (e) => {
+      activeFilters.outliersOnly = e.target.checked;
+      renderFiltered();
+    });
+  }
 
-  // Scan button
-  document.getElementById('btn-run-scan').addEventListener('click', triggerScan);
+  // Scan button (Header)
+  const runScanBtn = document.getElementById('btn-run-scan');
+  if (runScanBtn) {
+    runScanBtn.addEventListener('click', triggerScan);
+  }
+
+  // Toggle log box visibility button
+  const toggleLogsBtn = document.getElementById('btn-toggle-logs');
+  if (toggleLogsBtn) {
+    toggleLogsBtn.addEventListener('click', () => {
+      const logBox = document.getElementById('progress-log-box');
+      if (logBox) {
+        logBox.classList.toggle('hidden');
+      }
+    });
+  }
 
   // Config Modal
   document.getElementById('btn-open-config').addEventListener('click', openConfigModal);
@@ -260,13 +276,9 @@ function showKpiPreview(item, cardEl) {
     platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-amber-600/90 text-white border border-amber-400';
   }
 
-  // Status, Outlier & Simulation badges
+  // Status & Outlier badges
   const badgesEl = document.getElementById('kpi-prev-badges');
   badgesEl.innerHTML = '';
-  const isSample = item.id && item.id.startsWith('sample_');
-  if (isSample) {
-    badgesEl.innerHTML += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/25 text-amber-300 border border-amber-500/40" title="Demonstração regional inicial. Clique para buscar ao vivo na plataforma">Simulação</span>';
-  }
   if (item.condition === 'WORKING') {
     badgesEl.innerHTML += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/40">🟢 Funcional</span>';
   } else {
@@ -274,7 +286,7 @@ function showKpiPreview(item, cardEl) {
   }
   if (item.is_outlier) {
     const outlierDesc = item.outlier_type === 'LOW_OUTLIER' ? 'MUITO BARATA' : 'MUITO CARA';
-    badgesEl.innerHTML += `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/25 text-orange-300 border border-orange-500/40">⚠️ Outlier (${outlierDesc})</span>`;
+    badgesEl.innerHTML += `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/25 text-orange-300 border border-orange-500/40">⚠️ Outlier vs Iguais (${outlierDesc})</span>`;
   }
 
   // Model & VRAM
@@ -282,6 +294,14 @@ function showKpiPreview(item, cardEl) {
   document.getElementById('kpi-prev-vram').textContent = `${item.detected_vram_gb || '--'}GB VRAM`;
   document.getElementById('kpi-prev-title').textContent = item.title;
   document.getElementById('kpi-prev-price').textContent = formatBRL(item.price);
+
+  // Compute capability
+  const computeEl = document.getElementById('kpi-prev-compute');
+  if (computeEl) {
+    const tflops = item.compute_tflops !== null && item.compute_tflops !== undefined ? `${item.compute_tflops} TFLOPS` : '--';
+    const arch = item.architecture ? ` (${item.architecture})` : '';
+    computeEl.textContent = `${tflops}${arch}`;
+  }
 
   // Location & Distance
   const distStr = (item.distance_km !== null && item.distance_km !== undefined) ? ` (${item.distance_km} km de Veranópolis)` : '';
@@ -314,9 +334,7 @@ function showKpiPreview(item, cardEl) {
   // Update Call-to-action text
   const ctaEl = document.getElementById('kpi-prev-cta-text');
   if (ctaEl) {
-    ctaEl.textContent = isSample 
-      ? `Clique para buscar ${item.detected_model} ao vivo na ${item.platform}`
-      : `Clique para abrir o anúncio na ${item.platform}`;
+    ctaEl.textContent = `Clique para abrir o anúncio real na ${item.platform}`;
   }
 
   // Dynamic Positioning
@@ -401,14 +419,36 @@ function renderPlotlyChart(listings) {
   const chartEl = document.getElementById('gpu-chart');
   if (!listings || listings.length === 0) {
     Plotly.purge(chartEl);
-    chartEl.innerHTML = '<div class="h-full flex items-center justify-center text-slate-500 text-sm">Nenhuma placa encontrada com os filtros selecionados.</div>';
+    chartEl.innerHTML = '<div class="h-full flex items-center justify-center text-slate-500 text-sm">Nenhuma placa real encontrada com os filtros selecionados.</div>';
     return;
   }
+
+  // Mapeia cada modelo para seu poder computacional (FP32 TFLOPS oficial)
+  // Requisito Crítico: Quanto mais poderosa computacionalmente a GPU, mais à direita no eixo X!
+  const modelMap = {};
+  listings.forEach(item => {
+    const m = item.detected_model || 'NVIDIA';
+    const tf = (item.compute_tflops !== null && item.compute_tflops !== undefined) ? item.compute_tflops : 15.0;
+    if (!modelMap[m] || tf > modelMap[m].tflops) {
+      modelMap[m] = { model: m, tflops: tf };
+    }
+  });
+
+  // Ordena rigorosamente do menor para o maior poder computacional
+  // Assim as GPUs mais fortes (ex: 4090, 4080, 3090) ficam sempre mais à direita!
+  const sortedModels = Object.values(modelMap).sort((a, b) => a.tflops - b.tflops);
+
+  const modelToAxisLabel = {};
+  const categoryArray = [];
+  sortedModels.forEach(m => {
+    const label = `${m.model}<br><span style="font-size:10px;color:#A5B4FC">${m.tflops} TF</span>`;
+    modelToAxisLabel[m.model] = label;
+    categoryArray.push(label);
+  });
 
   // 1. Placas Funcionais Normais (Verde, Círculo)
   // 2. Placas com Defeito Normais (Vermelho, Quadrado)
   // 3. Outliers vs Placas Iguais (Laranja, Diamante)
-
   const traces = [
     {
       name: 'Funcional (Verde)',
@@ -417,7 +457,7 @@ function renderPlotlyChart(listings) {
       type: 'scatter',
       marker: {
         color: '#10B981', // Verde
-        size: 12,
+        size: 13,
         symbol: 'circle',
         line: { color: '#047857', width: 1.5 }
       }
@@ -429,7 +469,7 @@ function renderPlotlyChart(listings) {
       type: 'scatter',
       marker: {
         color: '#EF4444', // Vermelho
-        size: 12,
+        size: 13,
         symbol: 'square',
         line: { color: '#B91C1C', width: 1.5 }
       }
@@ -441,7 +481,7 @@ function renderPlotlyChart(listings) {
       type: 'scatter',
       marker: {
         color: '#F97316', // Laranja vibrante para Outliers
-        size: 15,
+        size: 16,
         symbol: 'diamond',
         line: { color: '#EA580C', width: 2 }
       }
@@ -461,7 +501,8 @@ function renderPlotlyChart(listings) {
       traceIdx = 1; // Placa com defeito aparece em VERMELHO
     }
 
-    traces[traceIdx].x.push(item.detected_model);
+    const xAxisLabel = modelToAxisLabel[item.detected_model] || item.detected_model;
+    traces[traceIdx].x.push(xAxisLabel);
     traces[traceIdx].y.push(item.price);
     traces[traceIdx].text.push(item.title);
     traces[traceIdx].customdata.push(item);
@@ -472,10 +513,16 @@ function renderPlotlyChart(listings) {
   const layout = {
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
-    margin: { l: 60, r: 20, t: 20, b: 65 },
+    margin: { l: 60, r: 20, t: 20, b: 75 },
     xaxis: {
+      title: {
+        text: 'Capacidade Computacional FP32 (TFLOPS) — Mais Poderosa à Direita ➔',
+        font: { size: 12, color: '#A5B4FC', family: 'Inter, sans-serif' }
+      },
       color: '#94A3B8',
       gridcolor: '#1E293B',
+      categoryorder: 'array',
+      categoryarray: categoryArray, // Ordem estritamente ordenada por TFLOPS
       tickfont: { size: 11, color: '#CBD5E1', family: 'Inter, sans-serif' },
       zerolinecolor: '#334155'
     },
@@ -515,6 +562,23 @@ function renderPlotlyChart(listings) {
     document.getElementById('hover-city').textContent = `${item.city} (${item.platform})${distStr}`;
     document.getElementById('hover-platform').textContent = item.platform;
     document.getElementById('hover-vram').textContent = `${item.detected_vram_gb}GB VRAM`;
+
+    // Compute metrics
+    const computeEl = document.getElementById('hover-compute');
+    if (computeEl) {
+      const tflops = item.compute_tflops !== null && item.compute_tflops !== undefined ? `${item.compute_tflops} TFLOPS` : '--';
+      const arch = item.architecture ? ` (${item.architecture})` : '';
+      computeEl.textContent = `${tflops}${arch}`;
+    }
+
+    const costTflopsEl = document.getElementById('hover-cost-tflops');
+    if (costTflopsEl) {
+      if (item.compute_tflops && item.compute_tflops > 0 && item.price > 0) {
+        costTflopsEl.textContent = `${formatBRL(item.price / item.compute_tflops)} / TFLOPS`;
+      } else {
+        costTflopsEl.textContent = '-';
+      }
+    }
 
     const imgEl = document.getElementById('hover-img');
     imgEl.src = item.image_url || 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=100&q=80';
@@ -618,9 +682,8 @@ function renderListingsCards(listings) {
       ? '<span class="outlier-badge px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40">OUTLIER VS IGUAIS</span>'
       : '';
 
-    const isSample = item.id && item.id.startsWith('sample_');
-    const sampleBadge = isSample 
-      ? '<span class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30" title="Demonstração inicial para visualização. Clique para buscar ao vivo na plataforma">Simulação</span>'
+    const computeBadge = (item.compute_tflops !== null && item.compute_tflops !== undefined)
+      ? `<span class="text-[11px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Capacidade Computacional: ${item.compute_tflops} TFLOPS FP32 (${item.architecture || 'NVIDIA'})">${item.compute_tflops} TF</span>`
       : '';
 
     const imgUrl = item.image_url || 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=300&q=80';
@@ -641,10 +704,10 @@ function renderListingsCards(listings) {
             <div class="flex flex-wrap items-center gap-1.5">
               ${condBadge}
               ${outlierBadge}
-              ${sampleBadge}
               <span class="text-[11px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
                 ${item.detected_vram_gb}GB VRAM
               </span>
+              ${computeBadge}
             </div>
             <h4 class="text-xs font-semibold text-white mt-1.5 line-clamp-2" title="${item.title}">${item.title}</h4>
             <div class="text-base font-bold text-white mt-1">${formatBRL(item.price)}</div>
@@ -670,8 +733,8 @@ function renderListingsCards(listings) {
         <button class="btn-view-benchmark flex-1 py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition flex items-center justify-center gap-1" data-id="${item.id}">
           <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Comparativo
         </button>
-        <a href="${getEffectiveListingUrl(item)}" target="_blank" rel="noopener noreferrer" class="flex-1 py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center justify-center gap-1 shadow-sm" title="${isSample ? 'Pesquisar este modelo ao vivo na plataforma' : 'Abrir anúncio original'}">
-          <span>${isSample ? 'Buscar Modelo ↗' : 'Abrir Anúncio'}</span>
+        <a href="${getEffectiveListingUrl(item)}" target="_blank" rel="noopener noreferrer" class="flex-1 py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center justify-center gap-1 shadow-sm" title="Abrir anúncio original">
+          <span>Abrir Anúncio ↗</span>
           <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
         </a>
       </div>
@@ -686,40 +749,144 @@ function renderListingsCards(listings) {
   });
 }
 
-// Trigger live scraping
-async function triggerScan() {
+// Helpers
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+function resetScanButtons() {
   const scanBtn = document.getElementById('btn-run-scan');
+  const toolbarBtn = document.getElementById('btn-toolbar-search');
   const scanIcon = document.getElementById('scan-icon');
   const indicator = document.getElementById('scan-status-indicator');
 
-  scanBtn.disabled = true;
-  scanIcon.classList.add('animate-spin');
-  indicator.classList.remove('hidden');
-  indicator.classList.add('flex');
+  if (scanBtn) scanBtn.disabled = false;
+  if (toolbarBtn) toolbarBtn.disabled = false;
+  if (scanIcon) scanIcon.classList.remove('animate-spin');
+  if (indicator) {
+    indicator.classList.add('hidden');
+    indicator.classList.remove('flex');
+  }
+}
+
+let pollInterval = null;
+
+function startProgressPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+
+  const progressPanel = document.getElementById('live-progress-panel');
+  if (progressPanel) progressPanel.classList.remove('hidden');
+
+  pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch('/api/scan/progress');
+      const prog = await res.json();
+
+      updateProgressUI(prog);
+
+      if (!prog.is_scanning && prog.current_step >= prog.total_steps) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        resetScanButtons();
+
+        // Atualiza cabeçalho para finalizado
+        const titleText = document.getElementById('progress-title-text');
+        if (titleText) titleText.textContent = 'Varredura Concluída';
+        const ping = document.getElementById('scan-pulse-ping');
+        if (ping) ping.classList.add('hidden');
+        const pctText = document.getElementById('progress-percent-text');
+        if (pctText) pctText.textContent = '100%';
+        const barFill = document.getElementById('progress-bar-fill');
+        if (barFill) barFill.style.width = '100%';
+
+        await loadData();
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar progresso da varredura:', e);
+    }
+  }, 800);
+}
+
+function updateProgressUI(prog) {
+  if (!prog) return;
+
+  const stepPill = document.getElementById('progress-step-pill');
+  const taskText = document.getElementById('progress-current-task');
+  const foundCount = document.getElementById('progress-found-count');
+  const percentText = document.getElementById('progress-percent-text');
+  const barFill = document.getElementById('progress-bar-fill');
+  const logBox = document.getElementById('progress-log-box');
+
+  const total = prog.total_steps || 7;
+  const current = prog.current_step || 1;
+  const pct = Math.min(100, Math.round((current / total) * 100));
+
+  if (stepPill) stepPill.textContent = `Etapa ${current} de ${total}`;
+  if (taskText) taskText.textContent = prog.current_task || 'Executando tarefas...';
+  if (foundCount) foundCount.textContent = prog.found_count || 0;
+  if (percentText) percentText.textContent = `${pct}%`;
+  if (barFill) barFill.style.width = `${pct}%`;
+
+  if (logBox && prog.logs && prog.logs.length > 0) {
+    logBox.innerHTML = prog.logs.map(log => {
+      const isSuccess = log.includes('✅') || log.includes('🏁');
+      const isWarn = log.includes('⚠️') || log.includes('❌');
+      const color = isSuccess ? 'text-emerald-400 font-medium' : (isWarn ? 'text-amber-400' : 'text-slate-300');
+      return `<div class="${color} py-0.5 leading-relaxed">${escapeHtml(log)}</div>`;
+    }).join('');
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+}
+
+// Trigger live scraping with custom parameters
+async function triggerScan() {
+  const maxPriceInput = document.getElementById('input-max-price');
+  const radiusInput = document.getElementById('input-radius-km');
+  const maxPrice = maxPriceInput ? parseFloat(maxPriceInput.value) : null;
+  const radiusKm = radiusInput ? parseFloat(radiusInput.value) : null;
+
+  const scanBtn = document.getElementById('btn-run-scan');
+  const toolbarBtn = document.getElementById('btn-toolbar-search');
+  const scanIcon = document.getElementById('scan-icon');
+  const indicator = document.getElementById('scan-status-indicator');
+  const progressPanel = document.getElementById('live-progress-panel');
+
+  if (scanBtn) scanBtn.disabled = true;
+  if (toolbarBtn) toolbarBtn.disabled = true;
+  if (scanIcon) scanIcon.classList.add('animate-spin');
+  if (indicator) {
+    indicator.classList.remove('hidden');
+    indicator.classList.add('flex');
+  }
+
+  // Revela o painel de tarefas ao vivo
+  if (progressPanel) {
+    progressPanel.classList.remove('hidden');
+    const titleText = document.getElementById('progress-title-text');
+    if (titleText) titleText.textContent = 'Varredura em Andamento';
+    const ping = document.getElementById('scan-pulse-ping');
+    if (ping) ping.classList.remove('hidden');
+  }
 
   try {
-    const res = await fetch('/api/scan', { method: 'POST' });
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        live: true,
+        max_price: maxPrice,
+        radius_km: radiusKm
+      })
+    });
     const data = await res.json();
     console.log('Varredura disparada:', data);
 
-    // Poll status every 2 seconds
-    const interval = setInterval(async () => {
-      const statusRes = await fetch('/api/scan/status');
-      const status = await statusRes.json();
-      if (!status.is_scanning) {
-        clearInterval(interval);
-        scanBtn.disabled = false;
-        scanIcon.classList.remove('animate-spin');
-        indicator.classList.add('hidden');
-        indicator.classList.remove('flex');
-        await loadData();
-      }
-    }, 2000);
+    startProgressPolling();
   } catch (err) {
     console.error('Erro na varredura:', err);
-    scanBtn.disabled = false;
-    scanIcon.classList.remove('animate-spin');
-    indicator.classList.add('hidden');
+    resetScanButtons();
   }
 }
 
@@ -729,13 +896,20 @@ async function checkScanStatus() {
     const statusRes = await fetch('/api/scan/status');
     const status = await statusRes.json();
     if (status.is_scanning) {
-      const indicator = document.getElementById('scan-status-indicator');
       const scanBtn = document.getElementById('btn-run-scan');
+      const toolbarBtn = document.getElementById('btn-toolbar-search');
       const scanIcon = document.getElementById('scan-icon');
-      indicator.classList.remove('hidden');
-      indicator.classList.add('flex');
-      scanBtn.disabled = true;
-      scanIcon.classList.add('animate-spin');
+      const indicator = document.getElementById('scan-status-indicator');
+
+      if (scanBtn) scanBtn.disabled = true;
+      if (toolbarBtn) toolbarBtn.disabled = true;
+      if (scanIcon) scanIcon.classList.add('animate-spin');
+      if (indicator) {
+        indicator.classList.remove('hidden');
+        indicator.classList.add('flex');
+      }
+
+      startProgressPolling();
     }
   } catch (e) {}
 }

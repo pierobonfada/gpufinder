@@ -39,7 +39,25 @@ CITY_COORDINATES: Dict[str, Tuple[float, float]] = {
     "barão": (-29.3789, -51.4983),
     "barao": (-29.3789, -51.4983),
     "passo fundo": (-28.2619, -52.4083),
-    "porto alegre": (-30.0346, -51.2177)
+    "novo hamburgo": (-29.6783, -51.1311),
+    "sao leopoldo": (-29.7603, -51.1472),
+    "canoas": (-29.9178, -51.1836),
+    "porto alegre": (-30.0346, -51.2177),
+    "lajeado": (-29.4672, -51.9614),
+    "estrela": (-29.5008, -51.9658),
+    "encantado": (-29.2372, -51.8719),
+    "teutonia": (-29.4472, -51.8089),
+    "montenegro": (-29.6886, -51.4608),
+    "gramado": (-29.3789, -50.8739),
+    "canela": (-29.3644, -50.8106),
+    "nova petropolis": (-29.3758, -51.1147),
+    "santa cruz do sul": (-29.7158, -52.4283),
+    "erechim": (-27.6342, -52.2739),
+    "vacaria": (-28.5117, -50.9339),
+    "santa maria": (-29.6842, -53.8069),
+    "pelotas": (-31.7654, -52.3376),
+    "gravatai": (-29.9439, -50.9928),
+    "viamao": (-30.0811, -51.0233)
 }
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
