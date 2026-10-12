@@ -17,6 +17,22 @@ const formatBRL = (val) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 };
 
+// Retorna URL efetiva do anúncio.
+// Para anúncios reais, usa a URL direta. Para itens de demonstração regional inicial (sample_),
+// redireciona para a busca ao vivo daquele modelo na respectiva plataforma para evitar links inexistentes.
+const getEffectiveListingUrl = (item) => {
+  if (!item) return '#';
+  if (item.id && item.id.startsWith('sample_')) {
+    const model = encodeURIComponent(item.detected_model || 'NVIDIA RTX');
+    if ((item.platform || '').toLowerCase().includes('facebook')) {
+      return `https://www.facebook.com/marketplace/search/?query=${model}`;
+    } else {
+      return `https://www.olx.com.br/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q=${model}`;
+    }
+  }
+  return item.url || '#';
+};
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
   if (window.lucide) {
@@ -110,8 +126,8 @@ function setupEventListeners() {
   const cardLowest = document.getElementById('card-kpi-lowest');
   if (cardLowest) {
     cardLowest.addEventListener('click', () => {
-      if (currentLowestItem && currentLowestItem.url) {
-        window.open(currentLowestItem.url, '_blank', 'noopener,noreferrer');
+      if (currentLowestItem) {
+        window.open(getEffectiveListingUrl(currentLowestItem), '_blank', 'noopener,noreferrer');
       }
     });
     cardLowest.addEventListener('mouseenter', () => {
@@ -128,8 +144,8 @@ function setupEventListeners() {
   const cardBestDeal = document.getElementById('card-kpi-best-deal');
   if (cardBestDeal) {
     cardBestDeal.addEventListener('click', () => {
-      if (currentBestDealItem && currentBestDealItem.url) {
-        window.open(currentBestDealItem.url, '_blank', 'noopener,noreferrer');
+      if (currentBestDealItem) {
+        window.open(getEffectiveListingUrl(currentBestDealItem), '_blank', 'noopener,noreferrer');
       }
     });
     cardBestDeal.addEventListener('mouseenter', () => {
@@ -244,9 +260,13 @@ function showKpiPreview(item, cardEl) {
     platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-amber-600/90 text-white border border-amber-400';
   }
 
-  // Status & Outlier badges
+  // Status, Outlier & Simulation badges
   const badgesEl = document.getElementById('kpi-prev-badges');
   badgesEl.innerHTML = '';
+  const isSample = item.id && item.id.startsWith('sample_');
+  if (isSample) {
+    badgesEl.innerHTML += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/25 text-amber-300 border border-amber-500/40" title="Demonstração regional inicial. Clique para buscar ao vivo na plataforma">Simulação</span>';
+  }
   if (item.condition === 'WORKING') {
     badgesEl.innerHTML += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/40">🟢 Funcional</span>';
   } else {
@@ -289,6 +309,14 @@ function showKpiPreview(item, cardEl) {
   } else {
     bmEl.textContent = 'Sem dados de benchmark nacional';
     bmEl.className = 'text-slate-400 font-normal';
+  }
+
+  // Update Call-to-action text
+  const ctaEl = document.getElementById('kpi-prev-cta-text');
+  if (ctaEl) {
+    ctaEl.textContent = isSample 
+      ? `Clique para buscar ${item.detected_model} ao vivo na ${item.platform}`
+      : `Clique para abrir o anúncio na ${item.platform}`;
   }
 
   // Dynamic Positioning
@@ -544,8 +572,8 @@ function renderPlotlyChart(listings) {
   chartDiv.on('plotly_click', function(data) {
     if (!data.points || data.points.length === 0) return;
     const item = data.points[0].customdata;
-    if (item && item.url) {
-      window.open(item.url, '_blank');
+    if (item) {
+      window.open(getEffectiveListingUrl(item), '_blank', 'noopener,noreferrer');
     }
   });
 }
@@ -590,6 +618,11 @@ function renderListingsCards(listings) {
       ? '<span class="outlier-badge px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40">OUTLIER VS IGUAIS</span>'
       : '';
 
+    const isSample = item.id && item.id.startsWith('sample_');
+    const sampleBadge = isSample 
+      ? '<span class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30" title="Demonstração inicial para visualização. Clique para buscar ao vivo na plataforma">Simulação</span>'
+      : '';
+
     const imgUrl = item.image_url || 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=300&q=80';
 
     const card = document.createElement('div');
@@ -608,6 +641,7 @@ function renderListingsCards(listings) {
             <div class="flex flex-wrap items-center gap-1.5">
               ${condBadge}
               ${outlierBadge}
+              ${sampleBadge}
               <span class="text-[11px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
                 ${item.detected_vram_gb}GB VRAM
               </span>
@@ -636,8 +670,8 @@ function renderListingsCards(listings) {
         <button class="btn-view-benchmark flex-1 py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition flex items-center justify-center gap-1" data-id="${item.id}">
           <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Comparativo
         </button>
-        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="flex-1 py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center justify-center gap-1 shadow-sm">
-          <span>Abrir Anúncio</span>
+        <a href="${getEffectiveListingUrl(item)}" target="_blank" rel="noopener noreferrer" class="flex-1 py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center justify-center gap-1 shadow-sm" title="${isSample ? 'Pesquisar este modelo ao vivo na plataforma' : 'Abrir anúncio original'}">
+          <span>${isSample ? 'Buscar Modelo ↗' : 'Abrir Anúncio'}</span>
           <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
         </a>
       </div>

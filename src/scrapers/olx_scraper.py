@@ -82,8 +82,8 @@ class OLXScraper(BaseScraper):
     def _extract_from_html(self, soup: BeautifulSoup) -> List[Dict]:
         """Fallback tradicional via seletores HTML caso o __NEXT_DATA__ não esteja presente."""
         ads = []
-        # Seletores comuns de cards do OLX
-        cards = soup.select('section[data-ds-component="DS-NewAdCard"], a[data-ds-component="DS-NewAdCard"], div.render-listing')
+        # Seletores comuns de cards do OLX (incluindo o moderno section.olx-adcard)
+        cards = soup.select('section.olx-adcard, section[data-ds-component="DS-NewAdCard"], a[data-ds-component="DS-NewAdCard"]')
         if not cards:
             cards = soup.select('li[class*="item"] a, a[class*="olx-ad-card"]')
 
@@ -94,12 +94,23 @@ class OLXScraper(BaseScraper):
             img_el = card.select_one('img')
 
             url = card.get("href") or ""
+            if not url:
+                link_el = card.select_one("a[href]")
+                if link_el:
+                    url = link_el.get("href") or ""
             if url and not url.startswith("http"):
                 url = f"https://www.olx.com.br{url}"
 
             title = title_el.get_text(strip=True) if title_el else ""
             price_str = price_el.get_text(strip=True) if price_el else ""
-            location_str = loc_el.get_text(strip=True) if loc_el else ""
+            raw_loc = loc_el.get_text(strip=True) if loc_el else ""
+
+            # Limpa datas e horários da string de localização para obter a cidade limpa
+            cleaned_loc = re.sub(r"\d+\s+de\s+[a-z]+.*$", "", raw_loc, flags=re.IGNORECASE)
+            cleaned_loc = re.sub(r"ontem.*$", "", cleaned_loc, flags=re.IGNORECASE)
+            cleaned_loc = re.sub(r"\d+:\d+.*$", "", cleaned_loc)
+            city = cleaned_loc.split(",")[0].strip() if cleaned_loc else raw_loc
+
             img_url = img_el.get("src") or img_el.get("data-src") if img_el else ""
 
             if title:
@@ -108,7 +119,7 @@ class OLXScraper(BaseScraper):
                     "price": self._extract_price(price_str),
                     "url": url,
                     "image_url": img_url,
-                    "city": location_str,
+                    "city": city,
                     "state": "RS",
                     "description": "",
                     "date": ""
@@ -132,7 +143,7 @@ class OLXScraper(BaseScraper):
         """Realiza busca de anúncios na Serra Gaúcha / cidades ao redor de Veranópolis."""
         listings: List[GPUListing] = []
         encoded_q = query.replace(" ", "%20")
-        url = f"https://www.olx.com.br/estado-rs/serra-gaucha?q={encoded_q}"
+        url = f"https://www.olx.com.br/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q={encoded_q}"
 
         try:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
