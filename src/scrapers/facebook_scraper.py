@@ -17,6 +17,8 @@ from src.scrapers.base import BaseScraper
 logger = logging.getLogger(__name__)
 
 class FacebookMarketplaceScraper(BaseScraper):
+    SEARCH_TERMS = ["rtx", "geforce", "gtx", "nvidia"]
+
     def __init__(self, config: AppConfig, defect_detector: DefectDetector):
         self.config = config
         self.defect_detector = defect_detector
@@ -108,14 +110,15 @@ class FacebookMarketplaceScraper(BaseScraper):
 
         return False
 
-    async def search_regional(self, query: str) -> List[GPUListing]:
-        """Varre o Facebook Marketplace por anúncios de GPU ao redor de Veranópolis."""
+    async def search_regional(self, query: str = "nvidia") -> List[GPUListing]:
+        """Varre o Facebook Marketplace por anúncios de GPU ao redor de Veranópolis e Serra Gaúcha."""
         if not self.config.scrapers.facebook.enabled:
             return []
 
         listings: List[GPUListing] = []
-        encoded_q = query.replace(" ", "%20")
-        marketplace_url = f"https://www.facebook.com/marketplace/portoalegre/search/?query={encoded_q}"
+        seen_ids = set()
+
+        search_terms = self.SEARCH_TERMS if query == "nvidia" else [query]
 
         async with async_playwright() as p:
             context = None
@@ -125,118 +128,130 @@ class FacebookMarketplaceScraper(BaseScraper):
 
                 await self._ensure_logged_in(page)
 
-                logger.info(f"Acessando Facebook Marketplace RS: {marketplace_url}")
-                await page.goto(marketplace_url, timeout=self.config.scrapers.facebook.timeout_seconds * 1000)
-                await page.wait_for_timeout(3000)
+                for term in search_terms:
+                    encoded_q = term.replace(" ", "%20")
+                    marketplace_url = f"https://www.facebook.com/marketplace/portoalegre/search/?query={encoded_q}"
 
-                # Rola suavemente a página para carregar itens dinâmicos
-                for _ in range(3):
-                    await page.evaluate("window.scrollBy(0, 1200)")
-                    await page.wait_for_timeout(1500)
-
-                # Seleciona cards de anúncios (links contendo '/marketplace/item/')
-                items = await page.query_selector_all('a[href*="/marketplace/item/"]')
-                logger.info(f"Encontrados {len(items)} itens no Facebook Marketplace para '{query}'")
-
-                for el in items:
+                    logger.info(f"Acessando Facebook Marketplace RS ({term}): {marketplace_url}")
                     try:
-                        text_content = await el.inner_text()
-                        if not text_content:
-                            continue
+                        await page.goto(marketplace_url, timeout=self.config.scrapers.facebook.timeout_seconds * 1000)
+                        await page.wait_for_timeout(2500)
 
-                        lines = [line.strip() for line in text_content.split("\n") if line.strip()]
-                        if not lines:
-                            continue
+                        # Rola a página para carregar anúncios dinâmicos
+                        for _ in range(2):
+                            await page.evaluate("window.scrollBy(0, 1000)")
+                            await page.wait_for_timeout(1000)
 
-                        price_val = 0.0
-                        title_val = ""
-                        loc_val = ""
+                        items = await page.query_selector_all('a[href*="/marketplace/item/"]')
+                        logger.info(f"Encontrados {len(items)} cards no Facebook Marketplace para '{term}'")
 
-                        for line in lines:
-                            if "R$" in line or re.search(r"^\d+[\.,]?\d*$", line):
-                                if price_val == 0.0:
-                                    price_val = self._extract_price(line)
-                            elif not title_val and len(line) > 3 and not line.startswith("R$") and not line.startswith("US$") and not line.startswith("Gratuito"):
-                                title_val = line
-                            
-                            # Extração de cidade
-                            if not loc_val:
-                                if ", rs" in line.lower() or ",rs" in line.lower():
-                                    loc_val = line.split(",")[0].strip()
-                                else:
-                                    for c in self.config.location.target_cities:
-                                        if c.lower() in line.lower():
-                                            loc_val = c
-                                            break
+                        for el in items:
+                            try:
+                                text_content = await el.inner_text()
+                                if not text_content:
+                                    continue
 
-                        if not title_val:
-                            title_val = lines[0]
+                                lines = [line.strip() for line in text_content.split("\n") if line.strip()]
+                                if not lines:
+                                    continue
 
-                        # 1. Filtro de preço básico (> 30)
-                        if price_val < 30.0:
-                            continue
+                                price_val = 0.0
+                                title_val = ""
+                                loc_val = ""
 
-                        # 2. Filtro de localização por raio geodésico (Haversine)
-                        from src.geo import is_within_radius
-                        in_radius, distance_km = is_within_radius(
-                            loc_val or self.config.location.center_city,
-                            self.config.location.latitude,
-                            self.config.location.longitude,
-                            self.config.location.radius_km
-                        )
-                        if not in_radius:
-                            continue
+                                for line in lines:
+                                    if "R$" in line or re.search(r"^\d+[\.,]?\d*$", line):
+                                        if price_val == 0.0:
+                                            price_val = self._extract_price(line)
+                                    elif not title_val and len(line) > 3 and not line.startswith("R$") and not line.startswith("US$") and not line.startswith("Gratuito") and not line.startswith("Acabou"):
+                                        title_val = line
 
-                        href = await el.query_selector("a")
-                        href_val = ""
-                        if href:
-                            href_val = await href.get_attribute("href") or ""
-                        elif await el.get_attribute("href"):
-                            href_val = await el.get_attribute("href") or ""
+                                    # Extração precisa de cidade (ex: "Caxias do Sul, RS" ou busca em cidades-alvo)
+                                    if not loc_val:
+                                        m_city = re.search(r"([A-Za-zÀ-ÿ\s]+),\s*(?:RS|rs)\b", line)
+                                        if m_city:
+                                            loc_val = m_city.group(1).strip()
+                                        else:
+                                            for c in self.config.location.target_cities:
+                                                if c.lower() in line.lower():
+                                                    loc_val = c
+                                                    break
 
-                        if href_val and not href_val.startswith("http"):
-                            href_val = f"https://www.facebook.com{href_val}"
+                                if not title_val:
+                                    title_val = lines[0]
 
-                        # 3. Identificação de GPU NVIDIA e VRAM (descartando PCs e notebooks)
-                        gpu_info = identify_gpu(title_val, text_content, href_val)
-                        if not gpu_info:
-                            continue
+                                # 1. Filtro de preço básico (> 30)
+                                if price_val < 30.0:
+                                    continue
 
-                        model_name, vram = gpu_info
+                                # 2. Filtro de localização por raio geodésico (Haversine)
+                                from src.geo import is_within_radius
+                                effective_city = loc_val or self.config.location.center_city
+                                in_radius, distance_km = is_within_radius(
+                                    effective_city,
+                                    self.config.location.latitude,
+                                    self.config.location.longitude,
+                                    self.config.location.radius_km
+                                )
+                                # Se encontrou uma cidade específica fora do raio, descarta
+                                if not in_radius and loc_val:
+                                    continue
 
-                        # Imagem do card
-                        img_el = await el.query_selector("img")
-                        img_src = await img_el.get_attribute("src") if img_el else ""
+                                href = await el.query_selector("a")
+                                href_val = ""
+                                if href:
+                                    href_val = await href.get_attribute("href") or ""
+                                elif await el.get_attribute("href"):
+                                    href_val = await el.get_attribute("href") or ""
 
+                                if href_val and not href_val.startswith("http"):
+                                    href_val = f"https://www.facebook.com{href_val}"
 
-                        # 5. Detecção de defeito / peças
-                        cond, reasons = self.defect_detector.analyze(title_val, text_content)
+                                # 3. Identificação de GPU NVIDIA e VRAM (descartando PCs e notebooks)
+                                gpu_info = identify_gpu(title_val, text_content, href_val)
+                                if not gpu_info:
+                                    continue
 
-                        item_id = f"fb_{re.sub(r'[^a-zA-Z0-9]', '', href_val)[-16:]}" if href_val else f"fb_{len(listings)}"
+                                model_name, vram = gpu_info
 
-                        listing = GPUListing(
-                            id=item_id,
-                            title=title_val,
-                            price=price_val,
-                            platform="Facebook",
-                            url=href_val,
-                            image_url=img_src,
-                            city=loc_val or self.config.location.center_city,
-                            state="RS",
-                            distance_km=distance_km,
-                            raw_location=loc_val,
-                            detected_model=model_name,
-                            detected_vram_gb=vram,
-                            condition=cond,
-                            defect_reasons=reasons,
-                            description=text_content
-                        )
-                        listings.append(listing)
-                    except Exception as item_err:
-                        logger.debug(f"Erro ao processar item do FB: {item_err}")
+                                item_id = f"fb_{re.sub(r'[^a-zA-Z0-9]', '', href_val)[-16:]}" if href_val else f"fb_{len(listings)}"
+                                if item_id in seen_ids:
+                                    continue
+                                seen_ids.add(item_id)
+
+                                # Imagem do card
+                                img_el = await el.query_selector("img")
+                                img_src = await img_el.get_attribute("src") if img_el else ""
+
+                                # 5. Detecção de defeito / peças
+                                cond, reasons = self.defect_detector.analyze(title_val, text_content)
+
+                                listing = GPUListing(
+                                    id=item_id,
+                                    title=title_val,
+                                    price=price_val,
+                                    platform="Facebook",
+                                    url=href_val,
+                                    image_url=img_src,
+                                    city=effective_city,
+                                    state="RS",
+                                    distance_km=distance_km,
+                                    raw_location=loc_val or effective_city,
+                                    detected_model=model_name,
+                                    detected_vram_gb=vram,
+                                    condition=cond,
+                                    defect_reasons=reasons,
+                                    description=text_content
+                                )
+                                listings.append(listing)
+                            except Exception as item_err:
+                                logger.debug(f"Erro ao processar item do FB: {item_err}")
+
+                    except Exception as term_err:
+                        logger.warning(f"Erro ao buscar termo '{term}' no Facebook: {term_err}")
 
             except Exception as e:
-                logger.warning(f"Erro ao executar scraper do Facebook Marketplace ({query}): {e}")
+                logger.warning(f"Erro ao executar scraper do Facebook Marketplace: {e}")
             finally:
                 if context:
                     await context.close()

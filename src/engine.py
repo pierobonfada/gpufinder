@@ -13,6 +13,7 @@ from src.gpu_performance import get_gpu_compute_data
 from src.models import GPUListing, GPUCondition, PriceClassification, ScanSummary, ScanProgress
 from src.outlier_detector import OutlierDetector
 from src.scrapers.facebook_scraper import FacebookMarketplaceScraper
+from src.scrapers.mercadolivre_scraper import MercadoLivreScraper
 from src.scrapers.olx_scraper import OLXScraper
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class GPUHunterEngine:
         self.benchmark_engine = BenchmarkEngine(self.config.national_benchmark)
         self.olx_scraper = OLXScraper(self.config, self.defect_detector)
         self.facebook_scraper = FacebookMarketplaceScraper(self.config, self.defect_detector)
+        self.mercadolivre_scraper = MercadoLivreScraper(self.config, self.defect_detector)
         self.is_scanning = False
         self.last_summary: Optional[ScanSummary] = None
         self.progress: ScanProgress = ScanProgress()
@@ -178,7 +180,7 @@ class GPUHunterEngine:
             return self.last_summary or ScanSummary()
 
         self.is_scanning = True
-        total_steps = 7
+        total_steps = 8
 
         from src.geo import get_city_coordinates, get_city_distance_from_center
         if center_city:
@@ -217,12 +219,12 @@ class GPUHunterEngine:
             listings_dict: Dict[str, GPUListing] = {}
 
             if include_live_scrapers:
-                # 1. OLX Regional (regiões circunvizinhas)
+                # 1. OLX Regional (regiões circunvizinhas e Serra Gaúcha)
                 if self.config.scrapers.olx.enabled:
                     self._log_progress(
                         2, total_steps,
-                        f"Varrendo OLX Regional para 'nvidia' ao redor de {city}...",
-                        f"🌐 OLX Regional: Buscando anúncios de 'nvidia' (páginas 1 a 3) e inspecionando descrições..."
+                        f"Varrendo OLX Regional (Caxias/Serra) ao redor de {city}...",
+                        f"🌐 OLX Regional: Buscando placas de vídeo (RTX, GTX, GeForce, NVIDIA)..."
                     )
                     try:
                         found = await self.olx_scraper.search_regional("nvidia", max_pages=3)
@@ -231,20 +233,20 @@ class GPUHunterEngine:
                         self.progress.found_count = len(listings_dict)
                         self._log_progress(
                             2, total_steps,
-                            f"OLX Regional: {len(found)} anúncios NVIDIA encontrados",
+                            f"OLX Regional: {len(found)} placas NVIDIA encontradas",
                             f"✅ OLX: {len(found)} placa(s) NVIDIA encontrada(s) no raio de {radius}km de {city} (Total: {len(listings_dict)})"
                         )
                     except Exception as e:
-                        logger.error(f"Erro ao varrer OLX para 'nvidia': {e}")
+                        logger.error(f"Erro ao varrer OLX Regional: {e}")
 
                     # 2. OLX Estadual (Placas de vídeo no Rio Grande do Sul)
                     self._log_progress(
                         3, total_steps,
-                        "Varrendo OLX RS categoria Placas de Vídeo para 'nvidia'...",
-                        "🌐 OLX RS: Buscando 'nvidia' na categoria de informática/placas de vídeo..."
+                        "Varrendo OLX RS categoria Placas de Vídeo...",
+                        "🌐 OLX RS: Buscando todas as placas NVIDIA na categoria de informática/placas de vídeo..."
                     )
                     try:
-                        found_state = await self.olx_scraper.search_state_rs(["nvidia"])
+                        found_state = await self.olx_scraper.search_state_rs(["nvidia", "rtx", "geforce", "gtx"])
                         for item in found_state:
                             listings_dict[item.id] = item
                         self.progress.found_count = len(listings_dict)
@@ -256,12 +258,12 @@ class GPUHunterEngine:
                     except Exception as e:
                         logger.error(f"Erro ao varrer OLX Estadual: {e}")
 
-                # 3. Facebook Marketplace
+                # 3. Facebook Marketplace RS
                 if self.config.scrapers.facebook.enabled:
                     self._log_progress(
                         4, total_steps,
                         f"Consultando Facebook Marketplace RS ao redor de {city}...",
-                        f"🔎 Facebook Marketplace: Conectando sessão automatizada e pesquisando 'nvidia'..."
+                        f"🔎 Facebook Marketplace: Pesquisando 'rtx', 'geforce', 'gtx' e 'nvidia'..."
                     )
                     try:
                         found_fb = await self.facebook_scraper.search_regional("nvidia")
@@ -270,17 +272,37 @@ class GPUHunterEngine:
                         self.progress.found_count = len(listings_dict)
                         self._log_progress(
                             4, total_steps,
-                            f"Facebook: {len(found_fb)} encontrados para 'nvidia'",
+                            f"Facebook: {len(found_fb)} encontrados",
                             f"✅ Facebook: {len(found_fb)} anúncio(s) no raio de {radius}km de {city} (Total: {len(listings_dict)})"
                         )
                     except Exception as e:
                         logger.debug(f"Facebook Marketplace: {e}")
 
+                # 4. Mercado Livre RS
+                if self.config.scrapers.mercadolivre.enabled:
+                    self._log_progress(
+                        5, total_steps,
+                        f"Consultando Mercado Livre RS ao redor de {city}...",
+                        f"🛒 Mercado Livre: Buscando placas de vídeo NVIDIA no RS..."
+                    )
+                    try:
+                        found_ml = await self.mercadolivre_scraper.search_regional("placa-de-video-nvidia", max_pages=2)
+                        for item in found_ml:
+                            listings_dict[item.id] = item
+                        self.progress.found_count = len(listings_dict)
+                        self._log_progress(
+                            5, total_steps,
+                            f"Mercado Livre: {len(found_ml)} encontrados",
+                            f"✅ Mercado Livre: {len(found_ml)} anúncio(s) no raio de {radius}km de {city} (Total: {len(listings_dict)})"
+                        )
+                    except Exception as e:
+                        logger.debug(f"Mercado Livre: {e}")
+
             all_raw = list(listings_dict.values())
 
-            # 4. Cálculo de distâncias geodésicas (Haversine) a partir da cidade central
+            # 5. Cálculo de distâncias geodésicas (Haversine) a partir da cidade central
             self._log_progress(
-                5, total_steps,
+                6, total_steps,
                 f"Calculando distâncias geodésicas até {city}...",
                 f"📍 Calculando distâncias até {city} ({lat}, {lon}) e aplicando raio de {radius}km..."
             )
@@ -295,9 +317,9 @@ class GPUHunterEngine:
 
                 filtered_by_location.append(item)
 
-            # 5. Atribuição de Capacidade Computacional (FP32 TFLOPS - TechPowerUp/NVIDIA)
+            # 6. Atribuição de Capacidade Computacional (FP32 TFLOPS - TechPowerUp/NVIDIA)
             self._log_progress(
-                6, total_steps,
+                7, total_steps,
                 "Atribuindo benchmarks de capacidade computacional (TFLOPS)...",
                 "⚡ Enriquecendo banco de dados com capacidade computacional FP32 TFLOPS (NVIDIA / TechPowerUp)..."
             )
@@ -307,7 +329,7 @@ class GPUHunterEngine:
                 item.memory_bandwidth_gbs = c_data["memory_bandwidth_gbs"]
                 item.architecture = c_data["architecture"]
 
-            # 6. Benchmark Nacional de Preços no Brasil
+            # 7. Benchmark Nacional de Preços no Brasil
             if self.config.national_benchmark.enabled and filtered_by_location:
                 unique_models = set(
                     item.detected_model 
@@ -316,7 +338,7 @@ class GPUHunterEngine:
                 )
                 for model in unique_models:
                     self._log_progress(
-                        7, total_steps,
+                        8, total_steps,
                         f"Pesquisando preços médios no Brasil para {model}...",
                         f"🇧🇷 Benchmark Nacional: Buscando preços médios no mercado brasileiro para {model}..."
                     )
@@ -325,7 +347,7 @@ class GPUHunterEngine:
                         if national_prices:
                             self.benchmark_engine.update_model_stats(model, national_prices)
                             self._log_progress(
-                                7, total_steps,
+                                8, total_steps,
                                 f"Benchmark atualizado para {model}",
                                 f"📊 Mediana calculada para {model}: R$ {self.benchmark_engine.get_stats_for_model(model).median_price:,.2f}"
                             )

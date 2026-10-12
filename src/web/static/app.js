@@ -386,12 +386,14 @@ function showKpiPreview(item, cardEl) {
 
   // Platform badge
   const platformEl = document.getElementById('kpi-prev-platform');
-  const isFb = (item.platform || '').toLowerCase().includes('facebook');
+  const platLower = (item.platform || '').toLowerCase();
   platformEl.textContent = item.platform || 'OLX';
-  if (isFb) {
+  if (platLower.includes('facebook')) {
     platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-blue-600/90 text-white border border-blue-400';
+  } else if (platLower.includes('mercadolivre') || platLower.includes('mercado livre')) {
+    platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-yellow-400 text-slate-900 border border-yellow-300';
   } else {
-    platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-amber-600/90 text-white border border-amber-400';
+    platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-purple-600/90 text-white border border-purple-400';
   }
 
   // Status & Outlier badges
@@ -835,14 +837,22 @@ function renderListingsCards(listings) {
     const imgUrl = item.image_url || 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=300&q=80';
 
     const card = document.createElement('div');
-    card.className = `glass-panel rounded-xl overflow-hidden p-4 flex flex-col justify-between border transition duration-200 hover:-translate-y-0.5 ${isOutlier ? 'border-orange-500/50 shadow-lg shadow-orange-500/10' : 'border-slate-800'}`;
-    
+    const platLower = (item.platform || '').toLowerCase();
+    let platBadgeClass = 'bg-black/80 text-white';
+    if (platLower.includes('facebook')) {
+      platBadgeClass = 'bg-blue-600/90 text-white border border-blue-400/50';
+    } else if (platLower.includes('mercadolivre') || platLower.includes('mercado livre')) {
+      platBadgeClass = 'bg-yellow-400 text-slate-950 font-black border border-yellow-300';
+    } else if (platLower.includes('olx')) {
+      platBadgeClass = 'bg-purple-600/90 text-white border border-purple-400/50';
+    }
+
     card.innerHTML = `
       <div>
         <div class="flex items-start gap-3">
           <div class="relative w-20 h-20 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0">
             <img src="${imgUrl}" alt="${item.title}" class="w-full h-full object-cover">
-            <span class="absolute bottom-1 left-1 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-black/80 text-white">
+            <span class="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shadow ${platBadgeClass}">
               ${item.platform}
             </span>
           </div>
@@ -963,7 +973,7 @@ function updateProgressUI(prog) {
   const barFill = document.getElementById('progress-bar-fill');
   const logBox = document.getElementById('progress-log-box');
 
-  const total = prog.total_steps || 7;
+  const total = prog.total_steps || 8;
   const current = prog.current_step || 1;
   const pct = Math.min(100, Math.round((current / total) * 100));
 

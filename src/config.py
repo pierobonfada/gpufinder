@@ -55,9 +55,19 @@ class FacebookConfig(BaseModel):
     session_file: str = "data/fb_session.json"
     timeout_seconds: int = 30
 
+class MercadoLivreConfig(BaseModel):
+    enabled: bool = True
+    headless: bool = True
+    email: str = ""
+    password: str = ""
+    session_file: str = "data/ml_session.json"
+    timeout_seconds: int = 30
+    max_pages: int = 3
+
 class ScrapersConfig(BaseModel):
     olx: OLXConfig = Field(default_factory=OLXConfig)
     facebook: FacebookConfig = Field(default_factory=FacebookConfig)
+    mercadolivre: MercadoLivreConfig = Field(default_factory=MercadoLivreConfig)
 
 class BenchmarkThresholds(BaseModel):
     great_deal_percent: float = -20.0

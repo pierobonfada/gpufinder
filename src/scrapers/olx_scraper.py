@@ -298,7 +298,9 @@ class OLXScraper(BaseScraper):
                         resp = await client.get(url, headers=self.headers)
                         if resp.status_code == 200:
                             soup = BeautifulSoup(resp.text, "lxml")
-                            raw_ads = self._extract_from_html(soup)
+                            raw_ads = self._extract_from_next_data(soup)
+                            if not raw_ads:
+                                raw_ads = self._extract_from_html(soup)
                             for ad in raw_ads:
                                 if ad["url"] in seen_urls:
                                     continue
