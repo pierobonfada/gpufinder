@@ -1,8 +1,8 @@
-# 🎯 GPU Hunter - Caçador de Placas NVIDIA de Alta VRAM (16GB a 32GB)
+# 🎯 GPU Finder - Buscador e Avaliador de Placas NVIDIA por Capacidade Computacional (TFLOPS) e Preço
 
-O **GPU Hunter** é um sistema completo desenvolvido sob medida para encontrar oportunidades de placas de vídeo NVIDIA com alta quantidade de memória (16GB a 32GB de VRAM) no **OLX** e no **Facebook Marketplace**, focado na região de **Veranópolis - RS** e cidades em um raio de 40km (Serra Gaúcha), com teto configurável de **R$ 5.000**.
+O **GPU Finder** é um sistema completo e automatizado para rastrear, classificar e auditar placas de vídeo NVIDIA seminovas e usadas no **OLX**, **Facebook Marketplace** e **Mercado Livre**, focado na região de **Veranópolis - RS** e cidades da Serra Gaúcha (raio configurável).
 
-O sistema conta com detecção inteligente de defeitos, análise estatística de outliers (IQR) e comparação com preços de todo o Brasil (Benchmark Nacional) para destacar oportunidades reais.
+O sistema conta com enriquecimento em tempo real de **Capacidade Computacional (FP32 TFLOPS)**, classificação comparativa contra a mediana do **Benchmark Nacional (Brasil todo)**, coloração visual por vantagem de preço (Verde/Laranja/Vermelho), filtro anti-PC Gamer (exclui anúncios de computadores completos e memória RAM de sistema) e painel interativo com Plotly.js.
 
 ---
 

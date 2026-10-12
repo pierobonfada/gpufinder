@@ -1,30 +1,44 @@
-# Template de exemplo de configuração para GPU Hunter
-# Copie para config.yaml se desejar restaurar os valores padrão
-hardware:
-  brand: "nvidia"
-  min_vram_gb: 16
-  max_vram_gb: 32
-  max_price_brl: 5000.0
-  min_price_brl: 150.0
+# ==============================================================================
+# GPU Finder - Configuração Geral de Busca e Parâmetros (Template Exemplo)
+# Copie este arquivo para config.yaml e configure conforme suas necessidades.
+# ==============================================================================
 
+# Filtros de Hardware da GPU
+hardware:
+  brand: "nvidia"                    # Placas NVIDIA
+  min_vram_gb: 4                     # Memória de vídeo mínima (GB)
+  max_vram_gb: 32                    # Memória de vídeo máxima (GB)
+  max_price_brl: 5000.0              # Preço máximo em Reais (R$)
+  min_price_brl: 150.0               # Preço mínimo para evitar acessórios ou anúncios 'R$ 1'
+
+# Localização e Raio de Busca
 location:
   center_city: "Veranópolis"
   state: "RS"
   latitude: -28.9358
   longitude: -51.5503
-  radius_km: 40
+  radius_km: 50                      # Raio de busca padrão em km ao redor de Veranópolis
+  # Cidades dentro ou próximas ao raio
   target_cities:
     - "Veranópolis"
     - "Bento Gonçalves"
-    - "Nova Prata"
-    - "Cotiporã"
+    - "Farroupilha"
+    - "Caxias do Sul"
+    - "Guaporé"
     - "Vila Flores"
-    - "Fagundes Varela"
     - "Garibaldi"
     - "Carlos Barbosa"
-    - "Guaporé"
-    - "Farroupilha"
+    - "Nova Prata"
+    - "Cotiporã"
+    - "Fagundes Varela"
+    - "Nova Roma do Sul"
+    - "Flores da Cunha"
+    - "Nova Bassano"
+    - "Protásio Alves"
+    - "Paraí"
+    - "Marau"
 
+# Palavras-chave indicativas de Placa com Defeito / Sucata / Peças
 defect_detection:
   keywords:
     - "com defeito"
@@ -32,32 +46,71 @@ defect_detection:
     - "para peças"
     - "para pecas"
     - "retirada de peças"
+    - "retirada de pecas"
     - "não dá vídeo"
     - "nao da video"
+    - "não da video"
+    - "nao dá video"
     - "sem vídeo"
+    - "sem video"
     - "queimada"
     - "sucata"
     - "tela preta"
+    - "com artefato"
     - "dando artefato"
-    - "artefato"
+    - "artefatos"
     - "precisa de reparo"
+    - "para reparo"
     - "no estado"
+    - "liga mas não dá vídeo"
+    - "liga mas não da video"
+    - "sem garantia de funcionamento"
+  # Termos que anulam o defeito se aparecerem em conjunto
+  negation_keywords:
+    - "sem defeito"
+    - "sem defeitos"
+    - "nenhum defeito"
+    - "100% funcionando"
+    - "funcionando perfeitamente"
+    - "teste na hora"
+    - "testada e aprovada"
+    - "zero defeito"
 
+# Configuração dos Scrapers
 scrapers:
   olx:
     enabled: true
     state_code: "rs"
+    subdomain_region: "serra-gaucha"
+    request_delay_seconds: 1.5
+    user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
   facebook:
     enabled: true
     headless: true
+    # Credenciais do Facebook (podem ser preenchidas aqui ou via FB_EMAIL e FB_PASSWORD)
     email: ""
     password: ""
     session_file: "data/fb_session.json"
+    timeout_seconds: 30
 
+  mercadolivre:
+    enabled: true
+    headless: true
+
+# Motor de Benchmark Nacional
 national_benchmark:
   enabled: true
   cache_ttl_hours: 24
+  min_samples_for_stats: 3
+  thresholds:
+    great_deal_percent: -20.0
+    cheap_percent: -8.0
+    expensive_percent: 10.0
+    very_expensive_percent: 25.0
 
+# Configuração do Servidor Web Dashboard
 server:
   host: "0.0.0.0"
   port: 7860
+  debug: false
