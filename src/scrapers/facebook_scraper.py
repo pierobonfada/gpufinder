@@ -118,20 +118,26 @@ class FacebookMarketplaceScraper(BaseScraper):
         if query != "nvidia":
             return [(query, None)]
 
-        from src.geo import get_all_known_cities, is_within_radius
+        from src.geo import is_within_radius, strip_accents
 
         center = self.config.location.center_city
         rad = self.config.location.radius_km
         lat = self.config.location.latitude
         lon = self.config.location.longitude
 
-        # Identifica cidades conhecidas dentro do raio ordenadas por proximidade
-        nearby: List[Tuple[float, str]] = []
-        for c in get_all_known_cities():
-            in_r, dist = is_within_radius(c, lat, lon, rad)
-            if in_r:
-                nearby.append((dist, c))
-        nearby.sort(key=lambda x: x[0])
+        # Cidades da região ordenadas por relevância e população comercial
+        regional_hubs = [
+            ("caxias", "Caxias do Sul"),
+            ("bento", "Bento Gonçalves"),
+            ("farroupilha", "Farroupilha"),
+            ("flores da cunha", "Flores da Cunha"),
+            ("carlos barbosa", "Carlos Barbosa"),
+            ("garibaldi", "Garibaldi"),
+            ("veranopolis", "Veranópolis"),
+            ("guapore", "Guaporé"),
+            ("nova prata", "Nova Prata"),
+            ("vila flores", "Vila Flores"),
+        ]
 
         queries: List[Tuple[str, Optional[str]]] = []
         seen_queries = set()
@@ -142,16 +148,17 @@ class FacebookMarketplaceScraper(BaseScraper):
                 seen_queries.add(term_clean)
                 queries.append((term, ctx_city))
 
-        # 1. Termos combinados com cidades-polo da região (máximo 6 cidades para equilibrar tempo)
-        top_cities = [c for _, c in nearby[:6]]
-        for city in top_cities:
-            add_q(f"rtx {city.lower()}", city)
-            add_q(f"gtx {city.lower()}", city)
-            add_q(f"placa de video {city.lower()}", city)
+        # 1. Busca focada nos polos urbanos da Serra Gaúcha dentro do raio
+        for token, city in regional_hubs:
+            in_r, dist = is_within_radius(city, lat, lon, rad)
+            if not in_r:
+                continue
 
-        # 2. Termo da própria cidade centro e Serra Gaúcha
-        add_q(f"rtx {center.lower()}", center)
-        add_q(f"placa de video {center.lower()}", center)
+            add_q(f"rtx {token}", city)
+            add_q(f"gtx {token}", city)
+            add_q(f"placa de video {token}", city)
+
+        # 2. Termos regionais agregados
         add_q("rtx serra gaucha", "Bento Gonçalves")
         add_q("placa de video serra gaucha", "Caxias do Sul")
 
@@ -187,12 +194,12 @@ class FacebookMarketplaceScraper(BaseScraper):
                     logger.info(f"Facebook Marketplace ({term}): {marketplace_url}")
                     try:
                         await page.goto(marketplace_url, timeout=self.config.scrapers.facebook.timeout_seconds * 1000)
-                        await page.wait_for_timeout(2000)
+                        await page.wait_for_timeout(1800)
 
                         # Rola a página para carregar anúncios dinâmicos
-                        for _ in range(4):
-                            await page.evaluate("window.scrollBy(0, 1200)")
-                            await page.wait_for_timeout(700)
+                        for _ in range(2):
+                            await page.evaluate("window.scrollBy(0, 1000)")
+                            await page.wait_for_timeout(600)
 
                         items = await page.query_selector_all('a[href*="/marketplace/item/"]')
 
@@ -245,8 +252,8 @@ class FacebookMarketplaceScraper(BaseScraper):
                                     self.config.location.longitude,
                                     self.config.location.radius_km
                                 )
-                                # Se encontrou uma cidade específica fora do raio, descarta
-                                if not in_radius and loc_val:
+                                # Se a cidade estiver fora do raio estipulado, descarta
+                                if not in_radius:
                                     continue
 
                                 href = await el.query_selector("a")
@@ -266,13 +273,14 @@ class FacebookMarketplaceScraper(BaseScraper):
 
                                 model_name, vram = gpu_info
 
-                                # Deduplicação por assinatura (modelo, preço, cidade) e item_id
-                                sig = (model_name, round(price_val), effective_city)
-                                if sig in seen_signatures:
-                                    continue
-                                seen_signatures.add(sig)
+                                m_id = re.search(r"/marketplace/item/(\d+)", href_val)
+                                if m_id:
+                                    item_id = f"fb_{m_id.group(1)}"
+                                    clean_url = f"https://www.facebook.com/marketplace/item/{m_id.group(1)}/"
+                                else:
+                                    item_id = f"fb_{len(listings)}_{round(price_val)}"
+                                    clean_url = href_val
 
-                                item_id = f"fb_{re.sub(r'[^a-zA-Z0-9]', '', href_val)[-16:]}" if href_val else f"fb_{len(listings)}"
                                 if item_id in seen_ids:
                                     continue
                                 seen_ids.add(item_id)
@@ -289,7 +297,7 @@ class FacebookMarketplaceScraper(BaseScraper):
                                     title=title_val,
                                     price=price_val,
                                     platform="Facebook",
-                                    url=href_val,
+                                    url=clean_url,
                                     image_url=img_src,
                                     city=effective_city,
                                     state="RS",
