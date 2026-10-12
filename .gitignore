@@ -1,0 +1,35 @@
+# ==============================================================================
+# GPU Hunter .gitignore - Proteção de Credenciais e Arquivos Sensíveis
+# ==============================================================================
+
+# Arquivo de configuração com credenciais e senhas (NUNCA comitar!)
+config.yaml
+
+# Variáveis de ambiente
+.env
+.env.*
+
+# Sessão, cookies e cache de dados locais (contém tokens de login do Facebook)
+data/
+data/fb_session.json
+data/listings.json
+data/benchmark_cache.json
+
+# Ambiente virtual Python e dependências
+.venv/
+venv/
+ENV/
+
+# Python Bytecode & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Logs e arquivos temporários
+*.log
+tmp/

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPU Hunter | Placas NVIDIA 16GB a 32GB até R$ 5.000</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <i data-lucide="cpu" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            GPU Hunter <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">NVIDIA 16-32GB</span>
+          </h1>
+          <p class="text-xs text-slate-400 flex items-center gap-1">
+            <i data-lucide="map-pin" class="w-3 h-3 text-emerald-400"></i>
+            <span id="header-location">Veranópolis - RS (Raio 40km)</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <!-- Scan Status Badge -->
+        <div id="scan-status-indicator" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+          <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
+          <span>Varrendo OLX & Facebook...</span>
+        </div>
+
+        <!-- Scan Button -->
+        <button id="btn-run-scan" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs sm:text-sm shadow-md transition">
+          <i data-lucide="refresh-cw" class="w-4 h-4" id="scan-icon"></i>
+          <span>Nova Varredura</span>
+        </button>
+
+        <!-- Config Button -->
+        <button id="btn-open-config" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs sm:text-sm border border-slate-700 transition">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Configurações</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="glass-panel rounded-2xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400">
+          <span class="text-xs uppercase font-semibold">Total de Placas</span>
+          <i data-lucide="database" class="w-4 h-4 text-slate-400"></i>
+        </div>
+        <div class="mt-2">
+          <div id="kpi-total" class="text-2xl font-bold text-white">0</div>
+          <div class="text-xs text-slate-400 mt-0.5">Dentro dos filtros (16-32GB ≤ R$ 5k)</div>
+        </div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400">
+          <span class="text-xs uppercase font-semibold">Condição</span>
+          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpi-working" class="text-2xl font-bold text-emerald-400">0</span>
+          <span class="text-xs text-slate-400">boas /</span>
+          <span id="kpi-defective" class="text-2xl font-bold text-rose-500">0</span>
+          <span class="text-xs text-slate-400">defeito</span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Identificação por palavras-chave</div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400">
+          <span class="text-xs uppercase font-semibold">Menor Preço Local</span>
+          <i data-lucide="tag" class="w-4 h-4 text-blue-400"></i>
+        </div>
+        <div class="mt-2">
+          <div id="kpi-lowest-price" class="text-2xl font-bold text-white">R$ 0</div>
+          <div id="kpi-lowest-desc" class="text-xs text-slate-400 mt-0.5 truncate">-</div>
+        </div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-4 flex flex-col justify-between border-emerald-500/30 bg-emerald-950/10">
+        <div class="flex items-center justify-between text-emerald-400">
+          <span class="text-xs uppercase font-semibold">Melhor Oportunidade</span>
+          <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i>
+        </div>
+        <div class="mt-2">
+          <div id="kpi-best-deal-price" class="text-2xl font-bold text-emerald-400">R$ 0</div>
+          <div id="kpi-best-deal-diff" class="text-xs text-emerald-300 font-medium truncate">vs Mediana Brasil</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="glass-panel rounded-2xl p-4 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- Search Input -->
+        <div class="relative flex-1 min-w-[240px]">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="text" id="filter-search" placeholder="Filtrar por modelo, cidade (ex: 3090, Bento, Tesla P40)..." 
+                 class="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+        </div>
+
+        <!-- VRAM Filters -->
+        <div class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+          <button class="vram-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition bg-indigo-600 text-white" data-vram="all">Todas VRAM</button>
+          <button class="vram-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-white" data-vram="16">16GB</button>
+          <button class="vram-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-white" data-vram="20">20GB</button>
+          <button class="vram-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-white" data-vram="24">24GB</button>
+          <button class="vram-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-white" data-vram="32">32GB</button>
+        </div>
+
+        <!-- Condition Filters -->
+        <div class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+          <button class="cond-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition bg-indigo-600 text-white" data-cond="all">Todas</button>
+          <button class="cond-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition text-emerald-400 hover:text-white flex items-center gap-1" data-cond="WORKING">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Funcionais
+          </button>
+          <button class="cond-filter-btn px-2.5 py-1.5 rounded-lg font-medium transition text-rose-400 hover:text-white flex items-center gap-1" data-cond="DEFECTIVE">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span> Defeito/Peças
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
+        <!-- Platform Toggle -->
+        <div class="flex items-center space-x-2">
+          <span>Plataforma:</span>
+          <button class="platform-filter-btn px-2 py-1 rounded-md bg-indigo-600 text-white font-medium" data-platform="all">Todas</button>
+          <button class="platform-filter-btn px-2 py-1 rounded-md bg-slate-900 text-slate-400 hover:text-white" data-platform="OLX">OLX</button>
+          <button class="platform-filter-btn px-2 py-1 rounded-md bg-slate-900 text-slate-400 hover:text-white" data-platform="Facebook">Facebook</button>
+        </div>
+
+        <!-- Price Range Slider -->
+        <div class="flex items-center space-x-3">
+          <span>Preço Máx:</span>
+          <input type="range" id="price-slider" min="500" max="5000" step="100" value="5000" class="w-32 sm:w-44 accent-indigo-500">
+          <span id="price-slider-val" class="font-bold text-white text-sm">R$ 5.000</span>
+        </div>
+
+        <!-- Outliers highlight toggle -->
+        <label class="flex items-center space-x-2 cursor-pointer select-none">
+          <input type="checkbox" id="chk-outliers-only" class="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0">
+          <span class="flex items-center gap-1">
+            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i> Apenas Outliers
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Chart Section with Interactive Plotly Canvas -->
+    <div class="glass-panel rounded-2xl p-5 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span>Distribuição de Preço das Placas</span>
+            <span class="text-xs font-normal text-slate-400">(Clique em um ponto para abrir o anúncio)</span>
+          </h2>
+          <p class="text-xs text-slate-400">Identificação de anomalias estatísticas de preço (Outliers IQR) e classificação funcional</p>
+        </div>
+
+        <!-- Legend Badges -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-medium">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Placa Funcional
+          </span>
+          <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-medium">
+            <span class="w-2.5 h-2.5 rounded-sm bg-rose-500"></span> Com Defeito / Peças
+          </span>
+          <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/15 border border-orange-500/40 text-orange-400 font-medium">
+            <span class="w-2.5 h-2.5 rounded-sm bg-orange-500 rotate-45 inline-block"></span> Outlier vs Iguais (Laranja)
+          </span>
+        </div>
+      </div>
+
+      <!-- Plotly Chart Div -->
+      <div class="relative w-full h-[460px] bg-slate-950/50 rounded-xl overflow-hidden border border-slate-800">
+        <div id="gpu-chart" class="w-full h-full"></div>
+
+        <!-- Chart Hover Floating Details Card -->
+        <div id="chart-hover-card" class="absolute hidden bg-slate-900/95 border border-slate-700 p-4 rounded-xl shadow-2xl backdrop-blur max-w-sm w-80 text-xs">
+          <div class="flex items-start gap-3">
+            <img id="hover-img" src="" class="w-16 h-16 object-cover rounded-lg bg-slate-800 flex-shrink-0 border border-slate-700">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span id="hover-platform" class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300"></span>
+                <span id="hover-vram" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300"></span>
+                <span id="hover-outlier" class="hidden px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400">OUTLIER</span>
+              </div>
+              <h4 id="hover-title" class="font-semibold text-white mt-1 truncate"></h4>
+              <div class="text-base font-bold text-emerald-400 mt-0.5" id="hover-price"></div>
+            </div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800 space-y-1.5">
+            <div class="flex justify-between text-slate-400">
+              <span>Localização:</span>
+              <span id="hover-city" class="text-slate-200 font-medium"></span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-400">Condição:</span>
+              <span id="hover-condition" class="font-medium"></span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-400">Comparativo Brasil:</span>
+              <span id="hover-benchmark" class="font-medium"></span>
+            </div>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-800 text-[11px] text-center text-indigo-400 flex items-center justify-center gap-1">
+            <i data-lucide="external-link" class="w-3 h-3"></i> Clique para abrir o anúncio
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Listings Grid and Table -->
+    <div class="glass-panel rounded-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-white">Anúncios Encontrados na Região</h3>
+          <p class="text-xs text-slate-400">Classificação contra o preço mediano de todo o Brasil</p>
+        </div>
+        <div class="text-xs text-slate-400">
+          Exibindo <span id="listings-count" class="font-bold text-white">0</span> resultados
+        </div>
+      </div>
+
+      <!-- Grid of Cards -->
+      <div id="listings-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Configuration Modal -->
+  <div id="modal-config" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl my-8">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="sliders" class="w-5 h-5 text-indigo-400"></i> Parâmetros do Caçador de GPUs
+        </h3>
+        <button id="btn-close-config" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm">
+        <!-- Hardware Settings -->
+        <div class="space-y-2">
+          <label class="font-bold text-slate-300 block">Filtros de Hardware</label>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">VRAM Mínima (GB)</span>
+              <input type="number" id="cfg-min-vram" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+            </div>
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">VRAM Máxima (GB)</span>
+              <input type="number" id="cfg-max-vram" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+            </div>
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">Preço Máximo (R$)</span>
+              <input type="number" id="cfg-max-price" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+            </div>
+          </div>
+        </div>
+
+        <!-- Location Settings -->
+        <div class="space-y-2">
+          <label class="font-bold text-slate-300 block">Localização e Raio</label>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">Cidade Central</span>
+              <input type="text" id="cfg-center-city" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+            </div>
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">Raio de Busca (km)</span>
+              <input type="number" id="cfg-radius" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+            </div>
+          </div>
+          <div>
+            <span class="text-slate-400 text-xs block mb-1">Cidades Alvo no Raio (separadas por vírgula)</span>
+            <input type="text" id="cfg-target-cities" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+          </div>
+        </div>
+
+        <!-- Facebook Credentials -->
+        <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-300 flex items-center gap-1.5">
+              <i data-lucide="facebook" class="w-4 h-4 text-blue-400"></i> Autenticação Facebook Marketplace
+            </span>
+            <span class="text-[11px] text-slate-400">Opcional mas recomendado</span>
+          </div>
+          <p class="text-xs text-slate-400">
+            O Facebook exige login para permitir navegação no Marketplace. Seus dados ficam salvos apenas localmente no seu computador em <code class="text-indigo-400">config.yaml</code>.
+          </p>
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">E-mail ou Usuário Facebook</span>
+              <input type="text" id="cfg-fb-email" placeholder="seu-email@gmail.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white">
+            </div>
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">Senha Facebook</span>
+              <input type="password" id="cfg-fb-password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white">
+            </div>
+          </div>
+        </div>
+
+        <!-- Defect keywords -->
+        <div class="space-y-1">
+          <span class="text-slate-400 text-xs block mb-1">Palavras-chave de Defeito (separadas por vírgula)</span>
+          <textarea id="cfg-defect-keywords" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-xs"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+        <button id="btn-cancel-config" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition text-xs sm:text-sm">
+          Cancelar
+        </button>
+        <button id="btn-save-config" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-md transition text-xs sm:text-sm flex items-center gap-2">
+          <i data-lucide="check" class="w-4 h-4"></i> Salvar Configurações
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Benchmark Details Modal -->
+  <div id="modal-benchmark" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div>
+          <h3 id="bm-modal-title" class="text-base font-bold text-white">Comparativo Nacional</h3>
+          <p id="bm-modal-subtitle" class="text-xs text-slate-400">Preços praticados em todo o Brasil</p>
+        </div>
+        <button id="btn-close-bm" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div id="bm-modal-body" class="space-y-3 text-xs sm:text-sm">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+    GPU Hunter &bull; Caçador Especializado em GPUs NVIDIA 16-32GB &bull; Veranópolis - RS &bull; OLX & Facebook Marketplace
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
