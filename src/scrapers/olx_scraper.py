@@ -139,70 +139,118 @@ class OLXScraper(BaseScraper):
 
         return is_within_radius(city_name, lat, lon, radius)
 
-    async def search_regional(self, query: str) -> List[GPUListing]:
-        """Realiza busca de anúncios na Serra Gaúcha / cidades ao redor de Veranópolis."""
+    async def _fetch_description(self, client: httpx.AsyncClient, url: str) -> str:
+        """Obtém a descrição completa do anúncio na página de detalhe."""
+        if not url:
+            return ""
+        try:
+            resp = await client.get(url, headers=self.headers, timeout=8.0)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "lxml")
+                desc_tag = soup.select_one('[data-ds-component="DS-Text"], [class*="description"], span.sc-1sj3nfx-0')
+                return desc_tag.get_text(separator=" ").strip() if desc_tag else ""
+        except Exception as e:
+            logger.debug(f"Falha ao carregar descrição de {url}: {e}")
+        return ""
+
+    async def search_regional(self, query: str = "nvidia", max_pages: int = 3) -> List[GPUListing]:
+        """
+        Realiza busca ampla (ex: 'nvidia') na Serra Gaúcha / cidades ao redor de Veranópolis,
+        navegando por múltiplas páginas e inspecionando descrições para filtrar a faixa de VRAM.
+        """
         listings: List[GPUListing] = []
         encoded_q = query.replace(" ", "%20")
-        url = f"https://www.olx.com.br/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q={encoded_q}"
+        all_raw_ads: List[Dict] = []
+        seen_urls = set()
+
+        urls_to_crawl = []
+        # 1. Busca ampla por termo regional (páginas 1 a max_pages)
+        for page in range(1, max_pages + 1):
+            urls_to_crawl.append(
+                f"https://www.olx.com.br/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q={encoded_q}&o={page}"
+            )
+        # 2. Categoria especializada de placas de vídeo na região
+        urls_to_crawl.append(
+            f"https://www.olx.com.br/informatica/placas-de-video/estado-rs/regioes-de-caxias-do-sul-e-passo-fundo?q={encoded_q}"
+        )
 
         try:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                resp = await client.get(url, headers=self.headers)
-                if resp.status_code != 200:
-                    logger.warning(f"OLX respondeu status {resp.status_code} para {url}")
-                    return listings
+                for url in urls_to_crawl:
+                    try:
+                        resp = await client.get(url, headers=self.headers)
+                        if resp.status_code == 200:
+                            soup = BeautifulSoup(resp.text, "lxml")
+                            extracted = self._extract_from_next_data(soup)
+                            if not extracted:
+                                extracted = self._extract_from_html(soup)
+                            for ad in extracted:
+                                if ad["url"] and ad["url"] not in seen_urls:
+                                    seen_urls.add(ad["url"])
+                                    all_raw_ads.append(ad)
+                        await asyncio.sleep(0.3)
+                    except Exception as page_err:
+                        logger.debug(f"Erro ao buscar {url}: {page_err}")
 
-                soup = BeautifulSoup(resp.text, "lxml")
-                raw_ads = self._extract_from_next_data(soup)
-                if not raw_ads:
-                    raw_ads = self._extract_from_html(soup)
-
-                for ad in raw_ads:
-                    title = ad["title"]
+                # Filtra anúncios candidatos pela localização e preço antes de buscar descrições
+                candidates = []
+                for ad in all_raw_ads:
                     price = ad["price"]
                     city = ad["city"]
-
-                    # 1. Filtro de preço configurável
                     if price <= 0 or price > self.config.hardware.max_price_brl or price < self.config.hardware.min_price_brl:
                         continue
 
-                    # 2. Filtro de localização por raio geodésico de Veranópolis (Haversine)
                     in_radius, distance_km = self._matches_target_region(city)
                     if not in_radius:
                         continue
 
-                    # 3. Identificação de GPU NVIDIA e VRAM (16GB a 32GB)
-                    gpu_info = identify_gpu(title, ad.get("description", ""))
+                    candidates.append((ad, distance_km))
+
+                logger.info(f"OLX Regional: {len(candidates)} anúncios candidatos dentro do raio geodésico.")
+
+                # Busca descrições dos candidatos para validar VRAM e detalhes
+                for ad, distance_km in candidates:
+                    title = ad["title"]
+                    desc = ad.get("description", "")
+                    
+                    # Se não possui descrição completa, busca na página do anúncio
+                    if not desc and ad.get("url"):
+                        desc = await self._fetch_description(client, ad["url"])
+                        ad["description"] = desc
+                        await asyncio.sleep(0.2)
+
+                    # Identifica GPU e VRAM
+                    gpu_info = identify_gpu(title, desc)
                     if not gpu_info:
                         continue
 
                     model_name, vram = gpu_info
 
-                    # 4. Verificação de limites de VRAM configurados
+                    # Valida faixa de VRAM configurada (16GB a 32GB)
                     if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
                         continue
 
-                    # 5. Detecção de defeito / peças / conserto
-                    cond, reasons = self.defect_detector.analyze(title, ad.get("description", ""))
+                    # Detecção de defeito / peças / conserto
+                    cond, reasons = self.defect_detector.analyze(title, desc)
 
                     listing_id = f"olx_{re.sub(r'[^a-zA-Z0-9]', '', ad['url'])[-16:]}" if ad["url"] else f"olx_{len(listings)}"
 
                     item = GPUListing(
                         id=listing_id,
                         title=title,
-                        price=price,
+                        price=ad["price"],
                         platform="OLX",
                         url=ad["url"],
                         image_url=ad.get("image_url") or "",
-                        city=city or self.config.location.center_city,
+                        city=ad["city"] or self.config.location.center_city,
                         state="RS",
                         distance_km=distance_km,
-                        raw_location=city,
+                        raw_location=ad["city"],
                         detected_model=model_name,
                         detected_vram_gb=vram,
                         condition=cond,
                         defect_reasons=reasons,
-                        description=ad.get("description", "")
+                        description=desc
                     )
                     listings.append(item)
 
@@ -239,51 +287,72 @@ class OLXScraper(BaseScraper):
 
         return prices
 
-    async def search_state_rs(self, queries: List[str]) -> List[GPUListing]:
-        """Varre a categoria especializada de informática/placas-de-video no Rio Grande do Sul."""
+    async def search_state_rs(self, queries: List[str] = ["nvidia"]) -> List[GPUListing]:
+        """Varre a categoria especializada de informática/placas-de-video no Rio Grande do Sul e filtra pelo raio."""
         listings: List[GPUListing] = []
+        seen_urls = set()
+        
         for q in queries:
             encoded_q = q.replace(" ", "%20")
-            url = f"https://www.olx.com.br/informatica/placas-de-video/estado-rs?q={encoded_q}"
-            try:
-                async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                    resp = await client.get(url, headers=self.headers)
-                    if resp.status_code == 200:
-                        soup = BeautifulSoup(resp.text, "lxml")
-                        raw_ads = self._extract_from_html(soup)
-                        for ad in raw_ads:
-                            title = ad["title"]
-                            price = ad["price"]
-                            city = ad["city"]
-                            gpu_info = identify_gpu(title, ad.get("description", ""))
-                            if not gpu_info:
-                                continue
-                            model_name, vram = gpu_info
-                            if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
-                                continue
-                            cond, reasons = self.defect_detector.analyze(title, ad.get("description", ""))
-                            from src.geo import get_city_distance_from_center
-                            dist = get_city_distance_from_center(city)
-                            listing_id = f"olx_{re.sub(r'[^a-zA-Z0-9]', '', ad['url'])[-16:]}" if ad["url"] else f"olx_{len(listings)}"
-                            item = GPUListing(
-                                id=listing_id,
-                                title=title,
-                                price=price,
-                                platform="OLX",
-                                url=ad["url"],
-                                image_url=ad.get("image_url") or "",
-                                city=city,
-                                state="RS",
-                                distance_km=dist,
-                                raw_location=city,
-                                detected_model=model_name,
-                                detected_vram_gb=vram,
-                                condition=cond,
-                                defect_reasons=reasons,
-                                description=ad.get("description", "")
-                            )
-                            listings.append(item)
-            except Exception as e:
-                logger.debug(f"Erro ao buscar no OLX RS ({q}): {e}")
-            await asyncio.sleep(0.3)
+            for page in range(1, 3):
+                url = f"https://www.olx.com.br/informatica/placas-de-video/estado-rs?q={encoded_q}&o={page}"
+                try:
+                    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                        resp = await client.get(url, headers=self.headers)
+                        if resp.status_code == 200:
+                            soup = BeautifulSoup(resp.text, "lxml")
+                            raw_ads = self._extract_from_html(soup)
+                            for ad in raw_ads:
+                                if ad["url"] in seen_urls:
+                                    continue
+                                seen_urls.add(ad["url"])
+
+                                title = ad["title"]
+                                price = ad["price"]
+                                city = ad["city"]
+
+                                if price <= 0 or price > self.config.hardware.max_price_brl or price < self.config.hardware.min_price_brl:
+                                    continue
+
+                                # Filtra estritamente pelo raio geodésico
+                                in_radius, distance_km = self._matches_target_region(city)
+                                if not in_radius:
+                                    continue
+
+                                desc = ad.get("description", "")
+                                if not desc and ad.get("url"):
+                                    desc = await self._fetch_description(client, ad["url"])
+                                    ad["description"] = desc
+                                    await asyncio.sleep(0.2)
+
+                                gpu_info = identify_gpu(title, desc)
+                                if not gpu_info:
+                                    continue
+                                model_name, vram = gpu_info
+                                if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
+                                    continue
+                                cond, reasons = self.defect_detector.analyze(title, desc)
+
+                                listing_id = f"olx_{re.sub(r'[^a-zA-Z0-9]', '', ad['url'])[-16:]}" if ad["url"] else f"olx_{len(listings)}"
+                                item = GPUListing(
+                                    id=listing_id,
+                                    title=title,
+                                    price=price,
+                                    platform="OLX",
+                                    url=ad["url"],
+                                    image_url=ad.get("image_url") or "",
+                                    city=city,
+                                    state="RS",
+                                    distance_km=distance_km,
+                                    raw_location=city,
+                                    detected_model=model_name,
+                                    detected_vram_gb=vram,
+                                    condition=cond,
+                                    defect_reasons=reasons,
+                                    description=desc
+                                )
+                                listings.append(item)
+                except Exception as e:
+                    logger.debug(f"Erro ao buscar no OLX RS ({q}): {e}")
+                await asyncio.sleep(0.3)
         return listings

@@ -44,6 +44,24 @@ NVIDIA_HIGH_VRAM_CATALOG: Dict[str, Dict] = {
         "architecture": "Ada Lovelace",
         "requires_explicit_vram": True
     },
+    "RTX 4090": {
+        "series": "GeForce",
+        "default_vram": 24,
+        "keywords": ["rtx 4090", "rtx4090", "geforce rtx 4090"],
+        "architecture": "Ada Lovelace"
+    },
+    "RTX 5080": {
+        "series": "GeForce",
+        "default_vram": 16,
+        "keywords": ["rtx 5080", "rtx5080", "geforce rtx 5080"],
+        "architecture": "Blackwell"
+    },
+    "RTX 5090": {
+        "series": "GeForce",
+        "default_vram": 32,
+        "keywords": ["rtx 5090", "rtx5090", "geforce rtx 5090"],
+        "architecture": "Blackwell"
+    },
     "Titan RTX": {
         "series": "Titan",
         "default_vram": 24,

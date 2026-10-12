@@ -115,7 +115,7 @@ class FacebookMarketplaceScraper(BaseScraper):
 
         listings: List[GPUListing] = []
         encoded_q = query.replace(" ", "%20")
-        marketplace_url = f"https://www.facebook.com/marketplace/search/?query={encoded_q}&exact=false"
+        marketplace_url = f"https://www.facebook.com/marketplace/portoalegre/search/?query={encoded_q}"
 
         async with async_playwright() as p:
             context = None
@@ -125,13 +125,14 @@ class FacebookMarketplaceScraper(BaseScraper):
 
                 await self._ensure_logged_in(page)
 
-                logger.info(f"Acessando Facebook Marketplace: {marketplace_url}")
+                logger.info(f"Acessando Facebook Marketplace RS: {marketplace_url}")
                 await page.goto(marketplace_url, timeout=self.config.scrapers.facebook.timeout_seconds * 1000)
                 await page.wait_for_timeout(3000)
 
                 # Rola suavemente a página para carregar itens dinâmicos
-                await page.evaluate("window.scrollBy(0, 1000)")
-                await page.wait_for_timeout(2000)
+                for _ in range(3):
+                    await page.evaluate("window.scrollBy(0, 1200)")
+                    await page.wait_for_timeout(1500)
 
                 # Seleciona cards de anúncios (links contendo '/marketplace/item/')
                 items = await page.query_selector_all('a[href*="/marketplace/item/"]')
@@ -147,23 +148,55 @@ class FacebookMarketplaceScraper(BaseScraper):
                         if not lines:
                             continue
 
-                        # Normalmente: [Preço, Título, Localização]
                         price_val = 0.0
                         title_val = ""
-                        loc_val = self.config.location.center_city
+                        loc_val = ""
 
                         for line in lines:
                             if "R$" in line or re.search(r"^\d+[\.,]?\d*$", line):
                                 if price_val == 0.0:
                                     price_val = self._extract_price(line)
-                            elif not title_val and len(line) > 3 and not line.startswith("R$"):
+                            elif not title_val and len(line) > 3 and not line.startswith("R$") and not line.startswith("US$") and not line.startswith("Gratuito"):
                                 title_val = line
-                            elif not loc_val or loc_val == self.config.location.center_city:
-                                if any(c.lower() in line.lower() for c in self.config.location.target_cities):
-                                    loc_val = line
+                            
+                            # Extração de cidade
+                            if not loc_val:
+                                if ", rs" in line.lower() or ",rs" in line.lower():
+                                    loc_val = line.split(",")[0].strip()
+                                else:
+                                    for c in self.config.location.target_cities:
+                                        if c.lower() in line.lower():
+                                            loc_val = c
+                                            break
 
                         if not title_val:
                             title_val = lines[0]
+
+                        # 1. Filtro de preço
+                        if price_val <= 0 or price_val > self.config.hardware.max_price_brl or price_val < self.config.hardware.min_price_brl:
+                            continue
+
+                        # 2. Filtro de localização por raio geodésico (Haversine)
+                        from src.geo import is_within_radius
+                        in_radius, distance_km = is_within_radius(
+                            loc_val or self.config.location.center_city,
+                            self.config.location.latitude,
+                            self.config.location.longitude,
+                            self.config.location.radius_km
+                        )
+                        if not in_radius:
+                            continue
+
+                        # 3. Identificação de GPU NVIDIA e VRAM (16GB a 32GB)
+                        gpu_info = identify_gpu(title_val, text_content)
+                        if not gpu_info:
+                            continue
+
+                        model_name, vram = gpu_info
+
+                        # 4. Verificação de limites de VRAM
+                        if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
+                            continue
 
                         # Imagem do card
                         img_el = await el.query_selector("img")
@@ -173,23 +206,8 @@ class FacebookMarketplaceScraper(BaseScraper):
                         if href and not href.startswith("http"):
                             href = f"https://www.facebook.com{href}"
 
-                        # 1. Filtro de preço
-                        if price_val <= 0 or price_val > self.config.hardware.max_price_brl or price_val < self.config.hardware.min_price_brl:
-                            continue
-
-                        # 2. Identificação de GPU NVIDIA e VRAM (16GB a 32GB)
-                        gpu_info = identify_gpu(title_val)
-                        if not gpu_info:
-                            continue
-
-                        model_name, vram = gpu_info
-
-                        # 3. Verificação de limites de VRAM
-                        if not (self.config.hardware.min_vram_gb <= vram <= self.config.hardware.max_vram_gb):
-                            continue
-
-                        # 4. Detecção de defeito / peças
-                        cond, reasons = self.defect_detector.analyze(title_val)
+                        # 5. Detecção de defeito / peças
+                        cond, reasons = self.defect_detector.analyze(title_val, text_content)
 
                         item_id = f"fb_{re.sub(r'[^a-zA-Z0-9]', '', href)[-16:]}" if href else f"fb_{len(listings)}"
 
@@ -200,8 +218,9 @@ class FacebookMarketplaceScraper(BaseScraper):
                             platform="Facebook",
                             url=href,
                             image_url=img_src,
-                            city=loc_val,
+                            city=loc_val or self.config.location.center_city,
                             state="RS",
+                            distance_km=distance_km,
                             raw_location=loc_val,
                             detected_model=model_name,
                             detected_vram_gb=vram,

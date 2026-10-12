@@ -235,6 +235,24 @@ GPU_COMPUTE_DATABASE: Dict[str, Dict] = {
         "vram_gb": 24,
         "display_name": "RTX 4090 (82.6 TFLOPS)",
         "source": "NVIDIA Whitepaper / TechPowerUp"
+    },
+    "RTX 5080": {
+        "compute_tflops": 57.0,
+        "tensor_tflops": 900.0,
+        "memory_bandwidth_gbs": 960.0,
+        "architecture": "Blackwell (GB203)",
+        "vram_gb": 16,
+        "display_name": "RTX 5080 (57.0 TFLOPS)",
+        "source": "NVIDIA Whitepaper / TechPowerUp"
+    },
+    "RTX 5090": {
+        "compute_tflops": 104.8,
+        "tensor_tflops": 1600.0,
+        "memory_bandwidth_gbs": 1792.0,
+        "architecture": "Blackwell (GB202)",
+        "vram_gb": 32,
+        "display_name": "RTX 5090 (104.8 TFLOPS)",
+        "source": "NVIDIA Whitepaper / TechPowerUp"
     }
 }
 

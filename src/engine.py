@@ -156,46 +156,40 @@ class GPUHunterEngine:
             if include_live_scrapers:
                 # 1. OLX Regional (Caxias do Sul e Passo Fundo)
                 if self.config.scrapers.olx.enabled:
-                    regional_queries = ["RTX 3090", "RTX 4080", "RTX 4060 Ti 16GB", "Tesla", "Quadro", "RTX 16GB", "Titan"]
-                    for idx, q in enumerate(regional_queries, 1):
-                        self._log_progress(
-                            2, total_steps,
-                            f"Varrendo OLX Regional para '{q}'...",
-                            f"🌐 OLX Regional ({idx}/{len(regional_queries)}): Buscando '{q}' em Caxias do Sul / Passo Fundo..."
-                        )
-                        try:
-                            found = await self.olx_scraper.search_regional(q)
-                            for item in found:
-                                listings_dict[item.id] = item
-                            self.progress.found_count = len(listings_dict)
-                            if found:
-                                self._log_progress(
-                                    2, total_steps,
-                                    f"OLX Regional: {len(found)} anúncios encontrados para '{q}'",
-                                    f"✅ OLX: {len(found)} placa(s) encontrada(s) para '{q}' (Total até agora: {len(listings_dict)})"
-                                )
-                            await asyncio.sleep(self.config.scrapers.olx.request_delay_seconds)
-                        except Exception as e:
-                            logger.error(f"Erro ao varrer OLX para '{q}': {e}")
-
-                    # 2. OLX Estadual (Placas de vídeo em todo o Rio Grande do Sul)
                     self._log_progress(
-                        3, total_steps,
-                        "Varrendo categoria de Placas de Vídeo no RS...",
-                        "🌐 OLX RS: Buscando no catálogo de informática/placas de vídeo do estado do RS..."
+                        2, total_steps,
+                        "Varrendo OLX Regional para 'nvidia' (páginas 1 a 3)...",
+                        f"🌐 OLX Regional: Buscando 'nvidia' em Caxias do Sul e região, inspecionando descrições para 16-32GB VRAM..."
                     )
                     try:
-                        state_queries = ["3090", "4080", "tesla", "quadro", "16gb", "24gb"]
-                        found_state = await self.olx_scraper.search_state_rs(state_queries)
+                        found = await self.olx_scraper.search_regional("nvidia", max_pages=3)
+                        for item in found:
+                            listings_dict[item.id] = item
+                        self.progress.found_count = len(listings_dict)
+                        self._log_progress(
+                            2, total_steps,
+                            f"OLX Regional: {len(found)} anúncios encontrados para 'nvidia'",
+                            f"✅ OLX: {len(found)} placa(s) encontrada(s) no raio de {radius}km (Total até agora: {len(listings_dict)})"
+                        )
+                    except Exception as e:
+                        logger.error(f"Erro ao varrer OLX para 'nvidia': {e}")
+
+                    # 2. OLX Estadual (Placas de vídeo no Rio Grande do Sul)
+                    self._log_progress(
+                        3, total_steps,
+                        "Varrendo OLX RS categoria Placas de Vídeo para 'nvidia'...",
+                        "🌐 OLX RS: Buscando 'nvidia' na categoria especializada de informática/placas de vídeo..."
+                    )
+                    try:
+                        found_state = await self.olx_scraper.search_state_rs(["nvidia"])
                         for item in found_state:
                             listings_dict[item.id] = item
                         self.progress.found_count = len(listings_dict)
-                        if found_state:
-                            self._log_progress(
-                                3, total_steps,
-                                f"OLX RS: {len(found_state)} placas encontradas no estado",
-                                f"✅ OLX Estadual: {len(found_state)} anúncio(s) adicionado(s) de GPUs no RS (Total: {len(listings_dict)})"
-                            )
+                        self._log_progress(
+                            3, total_steps,
+                            f"OLX RS: {len(found_state)} placas encontradas no raio",
+                            f"✅ OLX Estadual: {len(found_state)} placa(s) no raio de {radius}km (Total: {len(listings_dict)})"
+                        )
                     except Exception as e:
                         logger.error(f"Erro ao varrer OLX Estadual: {e}")
 
@@ -203,30 +197,21 @@ class GPUHunterEngine:
                 if self.config.scrapers.facebook.enabled:
                     self._log_progress(
                         4, total_steps,
-                        "Consultando Facebook Marketplace...",
-                        "🔎 Facebook Marketplace: Conectando sessão automatizada..."
+                        "Consultando Facebook Marketplace RS para 'nvidia'...",
+                        "🔎 Facebook Marketplace: Conectando sessão automatizada e pesquisando 'nvidia' no RS..."
                     )
-                    fb_queries = ["RTX 3090", "RTX 4060 Ti 16GB", "Tesla P40", "Quadro"]
-                    for q in fb_queries:
-                        try:
-                            self._log_progress(
-                                4, total_steps,
-                                f"Facebook Marketplace: buscando '{q}'...",
-                                f"🔍 Facebook: Pesquisando '{q}' na região..."
-                            )
-                            found_fb = await self.facebook_scraper.search_regional(q)
-                            for item in found_fb:
-                                listings_dict[item.id] = item
-                            self.progress.found_count = len(listings_dict)
-                            if found_fb:
-                                self._log_progress(
-                                    4, total_steps,
-                                    f"Facebook: {len(found_fb)} encontrados para '{q}'",
-                                    f"✅ Facebook: {len(found_fb)} anúncio(s) encontrado(s) para '{q}'"
-                                )
-                            await asyncio.sleep(1.5)
-                        except Exception as e:
-                            logger.debug(f"Facebook Marketplace: {e}")
+                    try:
+                        found_fb = await self.facebook_scraper.search_regional("nvidia")
+                        for item in found_fb:
+                            listings_dict[item.id] = item
+                        self.progress.found_count = len(listings_dict)
+                        self._log_progress(
+                            4, total_steps,
+                            f"Facebook: {len(found_fb)} encontrados para 'nvidia'",
+                            f"✅ Facebook: {len(found_fb)} anúncio(s) no raio de {radius}km (Total: {len(listings_dict)})"
+                        )
+                    except Exception as e:
+                        logger.debug(f"Facebook Marketplace: {e}")
 
             all_raw = list(listings_dict.values())
 
@@ -234,7 +219,7 @@ class GPUHunterEngine:
             self._log_progress(
                 5, total_steps,
                 "Calculando distâncias geodésicas para cada cidade...",
-                f"📍 Calculando distâncias até Veranópolis (-28.9358, -51.5503) e filtrando por raio de {radius}km..."
+                f"📍 Calculando distâncias até Veranópolis (-28.9358, -51.5503) e aplicando raio de {radius}km..."
             )
             from src.geo import get_city_distance_from_center
             filtered_by_location = []
@@ -242,12 +227,12 @@ class GPUHunterEngine:
                 if item.distance_km is None and item.city:
                     item.distance_km = get_city_distance_from_center(item.city)
 
-                # Aplica filtro de preço máximo configurado pelo usuário
-                if item.price > self.config.hardware.max_price_brl:
+                # Aplica filtro de preço configurado pelo usuário
+                if item.price > self.config.hardware.max_price_brl or item.price < self.config.hardware.min_price_brl:
                     continue
 
-                # Aplica filtro de raio configurado pelo usuário
-                if item.distance_km is not None and item.distance_km > self.config.location.radius_km:
+                # Aplica filtro de raio configurado pelo usuário (descarta fora do raio ou desconhecido)
+                if item.distance_km is None or item.distance_km > self.config.location.radius_km:
                     continue
 
                 filtered_by_location.append(item)
