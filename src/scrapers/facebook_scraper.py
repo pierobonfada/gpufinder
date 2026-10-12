@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
@@ -110,6 +110,57 @@ class FacebookMarketplaceScraper(BaseScraper):
 
         return False
 
+    def _build_search_queries(self, query: str) -> List[Tuple[str, Optional[str]]]:
+        """
+        Gera tuplas (termo_de_busca, cidade_de_contexto) combinando hardware com as cidades da região.
+        Permite encontrar os anúncios reais da Serra Gaúcha mesmo sem depender do feed geral do Facebook.
+        """
+        if query != "nvidia":
+            return [(query, None)]
+
+        from src.geo import get_all_known_cities, is_within_radius
+
+        center = self.config.location.center_city
+        rad = self.config.location.radius_km
+        lat = self.config.location.latitude
+        lon = self.config.location.longitude
+
+        # Identifica cidades conhecidas dentro do raio ordenadas por proximidade
+        nearby: List[Tuple[float, str]] = []
+        for c in get_all_known_cities():
+            in_r, dist = is_within_radius(c, lat, lon, rad)
+            if in_r:
+                nearby.append((dist, c))
+        nearby.sort(key=lambda x: x[0])
+
+        queries: List[Tuple[str, Optional[str]]] = []
+        seen_queries = set()
+
+        def add_q(term: str, ctx_city: Optional[str]):
+            term_clean = term.strip().lower()
+            if term_clean not in seen_queries:
+                seen_queries.add(term_clean)
+                queries.append((term, ctx_city))
+
+        # 1. Termos combinados com cidades-polo da região (máximo 6 cidades para equilibrar tempo)
+        top_cities = [c for _, c in nearby[:6]]
+        for city in top_cities:
+            add_q(f"rtx {city.lower()}", city)
+            add_q(f"gtx {city.lower()}", city)
+            add_q(f"placa de video {city.lower()}", city)
+
+        # 2. Termo da própria cidade centro e Serra Gaúcha
+        add_q(f"rtx {center.lower()}", center)
+        add_q(f"placa de video {center.lower()}", center)
+        add_q("rtx serra gaucha", "Bento Gonçalves")
+        add_q("placa de video serra gaucha", "Caxias do Sul")
+
+        # 3. Termos gerais de hardware
+        for b in self.SEARCH_TERMS:
+            add_q(b, None)
+
+        return queries
+
     async def search_regional(self, query: str = "nvidia") -> List[GPUListing]:
         """Varre o Facebook Marketplace por anúncios de GPU ao redor de Veranópolis e Serra Gaúcha."""
         if not self.config.scrapers.facebook.enabled:
@@ -117,8 +168,9 @@ class FacebookMarketplaceScraper(BaseScraper):
 
         listings: List[GPUListing] = []
         seen_ids = set()
+        seen_signatures = set()
 
-        search_terms = self.SEARCH_TERMS if query == "nvidia" else [query]
+        search_queries = self._build_search_queries(query)
 
         async with async_playwright() as p:
             context = None
@@ -128,22 +180,21 @@ class FacebookMarketplaceScraper(BaseScraper):
 
                 await self._ensure_logged_in(page)
 
-                for term in search_terms:
+                for term, context_city in search_queries:
                     encoded_q = term.replace(" ", "%20")
                     marketplace_url = f"https://www.facebook.com/marketplace/portoalegre/search/?query={encoded_q}"
 
-                    logger.info(f"Acessando Facebook Marketplace RS ({term}): {marketplace_url}")
+                    logger.info(f"Facebook Marketplace ({term}): {marketplace_url}")
                     try:
                         await page.goto(marketplace_url, timeout=self.config.scrapers.facebook.timeout_seconds * 1000)
-                        await page.wait_for_timeout(2500)
+                        await page.wait_for_timeout(2000)
 
                         # Rola a página para carregar anúncios dinâmicos
-                        for _ in range(2):
-                            await page.evaluate("window.scrollBy(0, 1000)")
-                            await page.wait_for_timeout(1000)
+                        for _ in range(4):
+                            await page.evaluate("window.scrollBy(0, 1200)")
+                            await page.wait_for_timeout(700)
 
                         items = await page.query_selector_all('a[href*="/marketplace/item/"]')
-                        logger.info(f"Encontrados {len(items)} cards no Facebook Marketplace para '{term}'")
 
                         for el in items:
                             try:
@@ -166,14 +217,15 @@ class FacebookMarketplaceScraper(BaseScraper):
                                     elif not title_val and len(line) > 3 and not line.startswith("R$") and not line.startswith("US$") and not line.startswith("Gratuito") and not line.startswith("Acabou"):
                                         title_val = line
 
-                                    # Extração precisa de cidade (ex: "Caxias do Sul, RS" ou busca em cidades-alvo)
+                                    # Extração precisa de cidade
                                     if not loc_val:
                                         m_city = re.search(r"([A-Za-zÀ-ÿ\s]+),\s*(?:RS|rs)\b", line)
                                         if m_city:
                                             loc_val = m_city.group(1).strip()
                                         else:
-                                            for c in self.config.location.target_cities:
-                                                if c.lower() in line.lower():
+                                            from src.geo import get_all_known_cities
+                                            for c in get_all_known_cities():
+                                                if re.search(r"\b" + re.escape(c.lower()) + r"\b", line.lower()):
                                                     loc_val = c
                                                     break
 
@@ -186,7 +238,7 @@ class FacebookMarketplaceScraper(BaseScraper):
 
                                 # 2. Filtro de localização por raio geodésico (Haversine)
                                 from src.geo import is_within_radius
-                                effective_city = loc_val or self.config.location.center_city
+                                effective_city = loc_val or context_city or self.config.location.center_city
                                 in_radius, distance_km = is_within_radius(
                                     effective_city,
                                     self.config.location.latitude,
@@ -213,6 +265,12 @@ class FacebookMarketplaceScraper(BaseScraper):
                                     continue
 
                                 model_name, vram = gpu_info
+
+                                # Deduplicação por assinatura (modelo, preço, cidade) e item_id
+                                sig = (model_name, round(price_val), effective_city)
+                                if sig in seen_signatures:
+                                    continue
+                                seen_signatures.add(sig)
 
                                 item_id = f"fb_{re.sub(r'[^a-zA-Z0-9]', '', href_val)[-16:]}" if href_val else f"fb_{len(listings)}"
                                 if item_id in seen_ids:

@@ -338,7 +338,10 @@ NVIDIA_GPU_CATALOG: Dict[str, Dict] = {
     "RTX A5000": { "series": "RTX Workstation", "default_vram": 24, "keywords": ["rtx a5000", "a5000"], "architecture": "Ampere" },
     "RTX A4500": { "series": "RTX Workstation", "default_vram": 20, "keywords": ["rtx a4500", "a4500"], "architecture": "Ampere" },
     "RTX A4000": { "series": "RTX Workstation", "default_vram": 16, "keywords": ["rtx a4000", "a4000"], "architecture": "Ampere" },
-    "RTX 4000 Ada": { "series": "RTX Workstation", "default_vram": 20, "keywords": ["rtx 4000 ada", "4000 ada"], "architecture": "Ada Lovelace" }
+    "RTX 4000 Ada": { "series": "RTX Workstation", "default_vram": 20, "keywords": ["rtx 4000 ada", "4000 ada"], "architecture": "Ada Lovelace" },
+    "T1000": { "series": "Workstation", "default_vram": 4, "keywords": ["t1000", "nvidia t1000"], "architecture": "Turing" },
+    "T600": { "series": "Workstation", "default_vram": 4, "keywords": ["t600", "nvidia t600"], "architecture": "Turing" },
+    "T400": { "series": "Workstation", "default_vram": 2, "keywords": ["t400", "nvidia t400"], "architecture": "Turing" }
 }
 
 NVIDIA_HIGH_VRAM_CATALOG = NVIDIA_GPU_CATALOG # retrocompatibilidade
@@ -401,7 +404,8 @@ MODEL_VALID_VRAMS: Dict[str, List[int]] = {
     "Quadro 4000": [2], "Quadro 2000": [1], "Quadro 600": [1],
     "Tesla V100": [16, 32], "Tesla P40": [24], "Tesla P100": [12, 16], "Tesla M40": [12, 24],
     "Tesla K80": [24], "Tesla T4": [16],
-    "RTX A6000": [48], "RTX A5000": [24], "RTX A4500": [20], "RTX A4000": [16], "RTX 4000 Ada": [20]
+    "RTX A6000": [48], "RTX A5000": [24], "RTX A4500": [20], "RTX A4000": [16], "RTX 4000 Ada": [20],
+    "T1000": [4, 8], "T600": [4], "T400": [2, 4]
 }
 
 def extract_explicit_vram(text: str) -> Optional[int]:
