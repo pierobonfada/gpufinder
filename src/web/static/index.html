@@ -396,20 +396,20 @@
             <span class="text-xs font-normal text-slate-400">(Clique em um ponto para abrir o anúncio)</span>
           </h2>
           <p class="text-xs text-slate-400">
-            Eixo X ordenado por poder computacional (NVIDIA Whitepapers / TechPowerUp): <strong class="text-indigo-300">Mais poderosa à direita ➔</strong> | Outliers IQR destacados em <strong class="text-orange-400">Laranja</strong>
+            Eixo X ordenado por poder computacional (NVIDIA Whitepapers / TechPowerUp): <strong class="text-indigo-300">Mais poderosa à direita ➔</strong> | Cores pelo preço vs mercado
           </p>
         </div>
 
         <!-- Legend Badges -->
         <div class="flex flex-wrap items-center gap-2 text-xs">
           <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-medium">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Placa Funcional
-          </span>
-          <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-medium">
-            <span class="w-2.5 h-2.5 rounded-sm bg-rose-500"></span> Com Defeito / Peças
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Na Média ou Mais Barata (Verde)
           </span>
           <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/15 border border-orange-500/40 text-orange-400 font-medium">
-            <span class="w-2.5 h-2.5 rounded-sm bg-orange-500 rotate-45 inline-block"></span> Outlier vs Iguais (Laranja)
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span> Mais Cara que a Média (Laranja)
+          </span>
+          <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-medium">
+            <span class="w-2.5 h-2.5 rounded-sm bg-rose-500 rotate-45 inline-block"></span> Outlier Discrepante (Vermelho)
           </span>
         </div>
       </div>
@@ -426,7 +426,7 @@
               <div class="flex items-center gap-1.5">
                 <span id="hover-platform" class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300"></span>
                 <span id="hover-vram" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300"></span>
-                <span id="hover-outlier" class="hidden px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400">OUTLIER</span>
+                <span id="hover-outlier" class="hidden px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/25 text-rose-400 border border-rose-500/40">OUTLIER</span>
               </div>
               <h4 id="hover-title" class="font-semibold text-white mt-1 truncate"></h4>
               <div class="text-base font-bold text-emerald-400 mt-0.5" id="hover-price"></div>

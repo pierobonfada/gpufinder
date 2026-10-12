@@ -44,24 +44,24 @@ body {
   background: #475569;
 }
 
-/* Outlier Pulse Animation (Laranja) */
+/* Outlier Pulse Animation (Vermelho) */
 @keyframes outlier-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.8);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8);
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(249, 115, 22, 0);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
   }
 }
 
 .outlier-badge {
   animation: outlier-pulse 2s infinite;
-  background-color: rgba(249, 115, 22, 0.2);
-  color: #fb923c;
-  border: 1px solid rgba(249, 115, 22, 0.5);
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.6);
 }
 
 /* Status Badges */
@@ -78,33 +78,33 @@ body {
 }
 
 .badge-opportunity {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background-color: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.6);
 }
 
 .badge-cheap {
-  background-color: rgba(16, 185, 129, 0.15);
+  background-color: rgba(16, 185, 129, 0.2);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
 .badge-average {
-  background-color: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .badge-expensive {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background-color: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.5);
 }
 
 .badge-very-expensive {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background-color: rgba(249, 115, 22, 0.3);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.6);
 }
 
 /* Plotly customization */

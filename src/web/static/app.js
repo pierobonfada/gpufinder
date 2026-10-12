@@ -594,59 +594,72 @@ function renderPlotlyChart(listings) {
     categoryArray.push(label);
   });
 
-  // 1. Placas Funcionais Normais (Verde, Círculo)
-  // 2. Placas com Defeito Normais (Vermelho, Quadrado)
-  // 3. Outliers vs Placas Iguais (Laranja, Diamante)
+  // 1. Placas Na Média ou Mais Baratas (Verde)
+  // 2. Placas Mais Caras que a Média (Laranja)
+  // 3. Outliers vs Placas Iguais (Vermelho)
   const traces = [
     {
-      name: 'Funcional (Verde)',
+      name: 'Na Média ou Mais Barata (Verde)',
       x: [], y: [], text: [], customdata: [],
       mode: 'markers',
       type: 'scatter',
       marker: {
         color: '#10B981', // Verde
         size: 13,
-        symbol: 'circle',
+        symbol: [],
         line: { color: '#047857', width: 1.5 }
       }
     },
     {
-      name: 'Com Defeito / Peças (Vermelho)',
+      name: 'Mais Cara que a Média (Laranja)',
       x: [], y: [], text: [], customdata: [],
       mode: 'markers',
       type: 'scatter',
       marker: {
-        color: '#EF4444', // Vermelho
+        color: '#F97316', // Laranja
         size: 13,
-        symbol: 'square',
-        line: { color: '#B91C1C', width: 1.5 }
+        symbol: [],
+        line: { color: '#EA580C', width: 1.5 }
       }
     },
     {
-      name: 'Outlier vs Iguais (Laranja)',
+      name: 'Outlier vs Iguais (Vermelho)',
       x: [], y: [], text: [], customdata: [],
       mode: 'markers',
       type: 'scatter',
       marker: {
-        color: '#F97316', // Laranja vibrante para Outliers
+        color: '#EF4444', // Vermelho para Outliers
         size: 16,
-        symbol: 'diamond',
-        line: { color: '#EA580C', width: 2 }
+        symbol: [],
+        line: { color: '#B91C1C', width: 2 }
       }
     }
   ];
 
   listings.forEach(item => {
-    const isOutlier = item.is_outlier;
+    const isOutlier = Boolean(item.is_outlier);
     const isWorking = item.condition === 'WORKING';
 
+    // Determina se a placa é mais cara que a média nacional
+    let isExpensive = false;
+    if (item.price_diff_percent !== null && item.price_diff_percent !== undefined) {
+      isExpensive = item.price_diff_percent > 0;
+    } else if (item.national_benchmark && item.national_benchmark.median_price > 0) {
+      isExpensive = item.price > item.national_benchmark.median_price;
+    } else if (item.price_classification) {
+      isExpensive = (item.price_classification === 'EXPENSIVE' || item.price_classification === 'VERY_EXPENSIVE');
+    }
+
     let traceIdx = 0;
+    let markerSym = isWorking ? 'circle' : 'square';
+
     if (isOutlier) {
-      traceIdx = 2; // OBRIGATÓRIO: Qualquer outlier aparece em LARANJA
-    } else if (isWorking) {
-      traceIdx = 0; // Placa boa/funcional aparece em VERDE
+      traceIdx = 2; // Requisito: Outliers em VERMELHO
+      markerSym = 'diamond';
+    } else if (isExpensive) {
+      traceIdx = 1; // Requisito: Mais caras que a média em LARANJA
     } else {
-      traceIdx = 1; // Placa com defeito aparece em VERMELHO
+      traceIdx = 0; // Requisito: Mais baratas ou na média em VERDE
     }
 
     const xAxisLabel = modelToAxisLabel[item.detected_model] || item.detected_model;
@@ -654,6 +667,7 @@ function renderPlotlyChart(listings) {
     traces[traceIdx].y.push(item.price);
     traces[traceIdx].text.push(item.title);
     traces[traceIdx].customdata.push(item);
+    traces[traceIdx].marker.symbol.push(markerSym);
   });
 
   const activeTraces = traces.filter(t => t.x.length > 0);
@@ -743,10 +757,11 @@ function renderPlotlyChart(listings) {
     const bmEl = document.getElementById('hover-benchmark');
     if (item.price_diff_percent !== null && item.price_diff_percent !== undefined) {
       const diff = item.price_diff_percent;
-      const label = diff < -8 ? 'Barata' : (diff > 10 ? 'Cara' : 'Na Média');
+      const isExpensive = diff > 0;
+      const label = diff < -8 ? 'Barata' : (diff > 0 ? 'Mais Cara que a Média' : 'Na Média');
       const prefix = diff > 0 ? '+' : '';
       bmEl.textContent = `${label} (${prefix}${diff.toFixed(0)}% vs Brasil)`;
-      bmEl.className = diff < -8 ? 'text-emerald-400 font-bold' : (diff > 10 ? 'text-amber-400 font-bold' : 'text-slate-300 font-medium');
+      bmEl.className = isExpensive ? 'text-orange-400 font-bold' : 'text-emerald-400 font-bold';
     } else {
       bmEl.textContent = 'Sem benchmark';
       bmEl.className = 'text-slate-400';
@@ -757,7 +772,7 @@ function renderPlotlyChart(listings) {
       outlierEl.classList.remove('hidden');
       const outlierDesc = item.outlier_type === 'LOW_OUTLIER' ? 'MUITO MAIS BARATA' : 'MUITO MAIS CARA';
       outlierEl.textContent = `OUTLIER (${outlierDesc} QUE AS IGUAIS)`;
-      outlierEl.className = 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/25 text-orange-400 border border-orange-500/50';
+      outlierEl.className = 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/25 text-rose-400 border border-rose-500/50';
     } else {
       outlierEl.classList.add('hidden');
     }
@@ -827,7 +842,7 @@ function renderListingsCards(listings) {
     }
 
     const outlierBadge = isOutlier 
-      ? '<span class="outlier-badge px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40">OUTLIER VS IGUAIS</span>'
+      ? '<span class="outlier-badge px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500/25 text-rose-400 border border-rose-500/50">OUTLIER VS IGUAIS</span>'
       : '';
 
     const computeBadge = (item.compute_tflops !== null && item.compute_tflops !== undefined)
@@ -836,7 +851,21 @@ function renderListingsCards(listings) {
 
     const imgUrl = item.image_url || 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=300&q=80';
 
+    const isExpensive = (item.price_diff_percent !== null && item.price_diff_percent !== undefined)
+      ? item.price_diff_percent > 0
+      : (item.price_classification === 'EXPENSIVE' || item.price_classification === 'VERY_EXPENSIVE');
+
+    let cardBorder = 'border-slate-800';
+    if (isOutlier) {
+      cardBorder = 'border-rose-500/60 shadow-lg shadow-rose-500/15 ring-1 ring-rose-500/30';
+    } else if (isExpensive) {
+      cardBorder = 'border-orange-500/40 hover:border-orange-500/70';
+    } else {
+      cardBorder = 'border-emerald-500/30 hover:border-emerald-500/60';
+    }
+
     const card = document.createElement('div');
+    card.className = `glass-panel rounded-xl overflow-hidden p-4 flex flex-col justify-between border transition duration-200 hover:-translate-y-0.5 ${cardBorder}`;
     const platLower = (item.platform || '').toLowerCase();
     let platBadgeClass = 'bg-black/80 text-white';
     if (platLower.includes('facebook')) {
