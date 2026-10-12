@@ -101,25 +101,49 @@
         <div class="text-[11px] text-slate-500 mt-0.5">Identificação por palavras-chave</div>
       </div>
 
-      <div class="glass-panel rounded-2xl p-4 flex flex-col justify-between">
+      <!-- KPI 3: Menor Preço Local -->
+      <div id="card-kpi-lowest" class="glass-panel rounded-2xl p-4 flex flex-col justify-between cursor-pointer hover:border-blue-500/60 hover:bg-slate-800/80 transition-all duration-200 group relative select-none">
         <div class="flex items-center justify-between text-slate-400">
-          <span class="text-xs uppercase font-semibold">Menor Preço Local</span>
-          <i data-lucide="tag" class="w-4 h-4 text-blue-400"></i>
+          <span class="text-xs uppercase font-semibold group-hover:text-blue-400 transition">Menor Preço Local</span>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="external-link" class="w-3.5 h-3.5 text-blue-400 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition"></i>
+            <i data-lucide="tag" class="w-4 h-4 text-blue-400"></i>
+          </div>
         </div>
         <div class="mt-2">
-          <div id="kpi-lowest-price" class="text-2xl font-bold text-white">R$ 0</div>
+          <div id="kpi-lowest-price" class="text-2xl font-bold text-white group-hover:text-blue-300 transition">R$ 0</div>
           <div id="kpi-lowest-desc" class="text-xs text-slate-400 mt-0.5 truncate">-</div>
+        </div>
+        <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-300 transition">
+          <span class="flex items-center gap-1 font-medium">
+            <i data-lucide="eye" class="w-3 h-3 text-blue-400"></i> Ver fotos / detalhes
+          </span>
+          <span class="text-slate-500 group-hover:text-blue-400 font-semibold flex items-center gap-0.5">
+            Abrir ↗
+          </span>
         </div>
       </div>
 
-      <div class="glass-panel rounded-2xl p-4 flex flex-col justify-between border-emerald-500/30 bg-emerald-950/10">
+      <!-- KPI 4: Melhor Oportunidade -->
+      <div id="card-kpi-best-deal" class="glass-panel rounded-2xl p-4 flex flex-col justify-between border-emerald-500/30 bg-emerald-950/10 cursor-pointer hover:border-emerald-400 hover:bg-emerald-950/30 transition-all duration-200 group relative select-none">
         <div class="flex items-center justify-between text-emerald-400">
-          <span class="text-xs uppercase font-semibold">Melhor Oportunidade</span>
-          <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i>
+          <span class="text-xs uppercase font-semibold group-hover:text-emerald-300 transition">Melhor Oportunidade</span>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="external-link" class="w-3.5 h-3.5 text-emerald-400 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition"></i>
+            <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i>
+          </div>
         </div>
         <div class="mt-2">
-          <div id="kpi-best-deal-price" class="text-2xl font-bold text-emerald-400">R$ 0</div>
+          <div id="kpi-best-deal-price" class="text-2xl font-bold text-emerald-400 group-hover:text-emerald-300 transition">R$ 0</div>
           <div id="kpi-best-deal-diff" class="text-xs text-emerald-300 font-medium truncate">vs Mediana Brasil</div>
+        </div>
+        <div class="mt-2 pt-2 border-t border-emerald-900/40 flex items-center justify-between text-[11px] text-emerald-400/80 group-hover:text-emerald-300 transition">
+          <span class="flex items-center gap-1 font-medium">
+            <i data-lucide="eye" class="w-3 h-3 text-emerald-400"></i> Ver fotos / detalhes
+          </span>
+          <span class="text-emerald-500 group-hover:text-emerald-300 font-semibold flex items-center gap-0.5">
+            Abrir ↗
+          </span>
         </div>
       </div>
     </div>
@@ -372,6 +396,61 @@
 
       <div id="bm-modal-body" class="space-y-3 text-xs sm:text-sm">
         <!-- Filled dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Hover Preview Card for Top KPI Cards (Menor Preço & Melhor Oportunidade) -->
+  <div id="kpi-preview-card" class="fixed z-50 hidden bg-slate-900/98 border border-slate-700/90 p-4 rounded-2xl shadow-2xl backdrop-blur-xl w-[340px] max-w-sm pointer-events-none transition-all duration-150 transform scale-100">
+    <div class="relative">
+      <!-- Image container with badges -->
+      <div class="relative w-full h-44 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center mb-3">
+        <img id="kpi-prev-img" src="" alt="GPU" class="w-full h-full object-cover hidden">
+        <div id="kpi-prev-no-img" class="flex flex-col items-center justify-center text-slate-500 gap-1.5 p-4 text-center">
+          <i data-lucide="cpu" class="w-10 h-10 text-slate-600"></i>
+          <span class="text-xs">Foto não disponível no anúncio</span>
+        </div>
+        <!-- Platform badge top-left -->
+        <span id="kpi-prev-platform" class="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-slate-900/90 text-white border border-slate-700"></span>
+        <!-- Badges top-right -->
+        <div id="kpi-prev-badges" class="absolute top-2 right-2 flex flex-col items-end gap-1"></div>
+      </div>
+
+      <!-- Model & VRAM tags -->
+      <div class="flex items-center justify-between gap-2">
+        <span id="kpi-prev-model" class="px-2 py-0.5 rounded text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"></span>
+        <span id="kpi-prev-vram" class="px-2 py-0.5 rounded text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30"></span>
+      </div>
+
+      <!-- Title -->
+      <h4 id="kpi-prev-title" class="font-semibold text-white text-sm mt-1.5 line-clamp-2 leading-snug"></h4>
+
+      <!-- Price -->
+      <div class="mt-2 flex items-baseline justify-between">
+        <span class="text-xs text-slate-400">Preço Anunciado:</span>
+        <div class="text-xl font-extrabold text-emerald-400" id="kpi-prev-price"></div>
+      </div>
+
+      <!-- Detailed Info List -->
+      <div class="mt-3 pt-2.5 border-t border-slate-800 space-y-1.5 text-xs">
+        <div class="flex justify-between items-center text-slate-400">
+          <span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-400"></i> Localização:</span>
+          <span id="kpi-prev-location" class="text-slate-200 font-medium"></span>
+        </div>
+        <div class="flex justify-between items-center text-slate-400">
+          <span class="flex items-center gap-1"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-indigo-400"></i> Condição:</span>
+          <span id="kpi-prev-condition" class="font-medium"></span>
+        </div>
+        <div class="flex justify-between items-center text-slate-400">
+          <span class="flex items-center gap-1"><i data-lucide="bar-chart-2" class="w-3.5 h-3.5 text-blue-400"></i> vs Brasil:</span>
+          <span id="kpi-prev-benchmark" class="font-semibold"></span>
+        </div>
+      </div>
+
+      <!-- Click Call to Action -->
+      <div class="mt-3 pt-2 border-t border-slate-800 flex items-center justify-center gap-1.5 text-xs text-indigo-300 font-medium bg-indigo-950/40 py-1.5 rounded-lg border border-indigo-500/20">
+        <i data-lucide="external-link" class="w-3.5 h-3.5 text-indigo-400"></i>
+        <span>Clique no card para abrir o anúncio</span>
       </div>
     </div>
   </div>

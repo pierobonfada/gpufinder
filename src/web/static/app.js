@@ -2,6 +2,8 @@
 
 let allListings = [];
 let currentConfig = null;
+let currentLowestItem = null;
+let currentBestDealItem = null;
 let activeFilters = {
   vram: 'all',
   condition: 'all',
@@ -104,6 +106,42 @@ function setupEventListeners() {
     document.getElementById('modal-benchmark').classList.add('hidden');
   });
 
+  // Top KPI Card: Menor Preço Local (Click to open, Hover to view preview)
+  const cardLowest = document.getElementById('card-kpi-lowest');
+  if (cardLowest) {
+    cardLowest.addEventListener('click', () => {
+      if (currentLowestItem && currentLowestItem.url) {
+        window.open(currentLowestItem.url, '_blank', 'noopener,noreferrer');
+      }
+    });
+    cardLowest.addEventListener('mouseenter', () => {
+      if (currentLowestItem) {
+        showKpiPreview(currentLowestItem, cardLowest);
+      }
+    });
+    cardLowest.addEventListener('mouseleave', () => {
+      hideKpiPreview();
+    });
+  }
+
+  // Top KPI Card: Melhor Oportunidade (Click to open, Hover to view preview)
+  const cardBestDeal = document.getElementById('card-kpi-best-deal');
+  if (cardBestDeal) {
+    cardBestDeal.addEventListener('click', () => {
+      if (currentBestDealItem && currentBestDealItem.url) {
+        window.open(currentBestDealItem.url, '_blank', 'noopener,noreferrer');
+      }
+    });
+    cardBestDeal.addEventListener('mouseenter', () => {
+      if (currentBestDealItem) {
+        showKpiPreview(currentBestDealItem, cardBestDeal);
+      }
+    });
+    cardBestDeal.addEventListener('mouseleave', () => {
+      hideKpiPreview();
+    });
+  }
+
   window.addEventListener('resize', () => {
     Plotly.Plots.resize('gpu-chart');
   });
@@ -147,20 +185,141 @@ function updateKPIs(summary) {
   document.getElementById('kpi-working').textContent = summary.working_count;
   document.getElementById('kpi-defective').textContent = summary.defective_count;
 
-  if (summary.lowest_price > 0) {
-    document.getElementById('kpi-lowest-price').textContent = formatBRL(summary.lowest_price);
-    const lowestItem = allListings.find(i => i.price === summary.lowest_price);
-    if (lowestItem) {
-      document.getElementById('kpi-lowest-desc').textContent = `${lowestItem.detected_model} (${lowestItem.city})`;
+  // Track and update Menor Preço Local
+  currentLowestItem = summary.lowest_item || allListings.find(i => i.price === summary.lowest_price) || null;
+  if (currentLowestItem && currentLowestItem.price > 0) {
+    document.getElementById('kpi-lowest-price').textContent = formatBRL(currentLowestItem.price);
+    document.getElementById('kpi-lowest-desc').textContent = `${currentLowestItem.detected_model} (${currentLowestItem.city})`;
+    const cardLowest = document.getElementById('card-kpi-lowest');
+    if (cardLowest) {
+      cardLowest.setAttribute('title', `Clique para abrir o anúncio de ${currentLowestItem.detected_model} na ${currentLowestItem.platform}`);
     }
+  } else if (summary.lowest_price > 0) {
+    document.getElementById('kpi-lowest-price').textContent = formatBRL(summary.lowest_price);
   }
 
-  if (summary.best_deal) {
-    const bd = summary.best_deal;
+  // Track and update Melhor Oportunidade
+  currentBestDealItem = summary.best_deal || null;
+  if (currentBestDealItem) {
+    const bd = currentBestDealItem;
     document.getElementById('kpi-best-deal-price').textContent = formatBRL(bd.price);
     const diffPct = bd.price_diff_percent || 0;
     document.getElementById('kpi-best-deal-diff').textContent = 
       `${bd.detected_model} (${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}% vs Brasil)`;
+    const cardBestDeal = document.getElementById('card-kpi-best-deal');
+    if (cardBestDeal) {
+      cardBestDeal.setAttribute('title', `Clique para abrir o anúncio de ${bd.detected_model} na ${bd.platform}`);
+    }
+  }
+}
+
+// Show Floating Preview Popover for Top KPI Cards (with photo, title, model, condition, benchmark)
+function showKpiPreview(item, cardEl) {
+  const popover = document.getElementById('kpi-preview-card');
+  if (!popover || !item) return;
+
+  // Photo / Thumbnail
+  const imgEl = document.getElementById('kpi-prev-img');
+  const noImgEl = document.getElementById('kpi-prev-no-img');
+  if (item.image_url) {
+    imgEl.src = item.image_url;
+    imgEl.classList.remove('hidden');
+    noImgEl.classList.add('hidden');
+    imgEl.onerror = () => {
+      imgEl.classList.add('hidden');
+      noImgEl.classList.remove('hidden');
+    };
+  } else {
+    imgEl.classList.add('hidden');
+    noImgEl.classList.remove('hidden');
+  }
+
+  // Platform badge
+  const platformEl = document.getElementById('kpi-prev-platform');
+  const isFb = (item.platform || '').toLowerCase().includes('facebook');
+  platformEl.textContent = item.platform || 'OLX';
+  if (isFb) {
+    platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-blue-600/90 text-white border border-blue-400';
+  } else {
+    platformEl.className = 'absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold shadow bg-amber-600/90 text-white border border-amber-400';
+  }
+
+  // Status & Outlier badges
+  const badgesEl = document.getElementById('kpi-prev-badges');
+  badgesEl.innerHTML = '';
+  if (item.condition === 'WORKING') {
+    badgesEl.innerHTML += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/40">🟢 Funcional</span>';
+  } else {
+    badgesEl.innerHTML += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/25 text-rose-300 border border-rose-500/40">🔴 Com Defeito</span>';
+  }
+  if (item.is_outlier) {
+    const outlierDesc = item.outlier_type === 'LOW_OUTLIER' ? 'MUITO BARATA' : 'MUITO CARA';
+    badgesEl.innerHTML += `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/25 text-orange-300 border border-orange-500/40">⚠️ Outlier (${outlierDesc})</span>`;
+  }
+
+  // Model & VRAM
+  document.getElementById('kpi-prev-model').textContent = item.detected_model || 'NVIDIA';
+  document.getElementById('kpi-prev-vram').textContent = `${item.detected_vram_gb || '--'}GB VRAM`;
+  document.getElementById('kpi-prev-title').textContent = item.title;
+  document.getElementById('kpi-prev-price').textContent = formatBRL(item.price);
+
+  // Location & Distance
+  const distStr = (item.distance_km !== null && item.distance_km !== undefined) ? ` (${item.distance_km} km de Veranópolis)` : '';
+  document.getElementById('kpi-prev-location').textContent = `${item.city || 'Serra Gaúcha'}${distStr}`;
+
+  // Condition
+  const condEl = document.getElementById('kpi-prev-condition');
+  if (item.condition === 'WORKING') {
+    condEl.textContent = '🟢 Funcional (Sem defeitos)';
+    condEl.className = 'font-semibold text-emerald-400';
+  } else {
+    const reason = (item.defect_reasons && item.defect_reasons.length > 0) ? ` (${item.defect_reasons[0]})` : '';
+    condEl.textContent = `🔴 Para conserto / peças${reason}`;
+    condEl.className = 'font-semibold text-rose-400';
+  }
+
+  // Benchmark vs Brasil
+  const bmEl = document.getElementById('kpi-prev-benchmark');
+  if (item.price_diff_percent !== null && item.price_diff_percent !== undefined) {
+    const diff = item.price_diff_percent;
+    const prefix = diff > 0 ? '+' : '';
+    const med = item.national_benchmark ? formatBRL(item.national_benchmark.median_price) : '';
+    bmEl.textContent = `${med ? `${med} • ` : ''}${prefix}${diff.toFixed(0)}% (${item.price_classification || 'Benchmark'})`;
+    bmEl.className = diff < -8 ? 'font-bold text-emerald-400' : (diff > 10 ? 'font-bold text-amber-400' : 'font-medium text-slate-300');
+  } else {
+    bmEl.textContent = 'Sem dados de benchmark nacional';
+    bmEl.className = 'text-slate-400 font-normal';
+  }
+
+  // Dynamic Positioning
+  const rect = cardEl.getBoundingClientRect();
+  const popoverWidth = 340;
+  let left = rect.left + (rect.width / 2) - (popoverWidth / 2);
+  if (left < 16) left = 16;
+  if (left + popoverWidth > window.innerWidth - 16) {
+    left = window.innerWidth - popoverWidth - 16;
+  }
+
+  let top = rect.bottom + 8;
+  const popoverHeight = 380;
+  if (top + popoverHeight > window.innerHeight && rect.top > popoverHeight + 16) {
+    top = rect.top - popoverHeight - 8;
+  }
+
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+  popover.classList.remove('hidden');
+
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+// Hide Floating Preview Popover
+function hideKpiPreview() {
+  const popover = document.getElementById('kpi-preview-card');
+  if (popover) {
+    popover.classList.add('hidden');
   }
 }
 

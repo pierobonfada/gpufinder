@@ -60,6 +60,11 @@ class GPUHunterEngine:
         outliers = [i for i in listings if i.is_outlier]
         prices = [i.price for i in listings if i.price > 0]
 
+        lowest_item = None
+        valid_items = [i for i in listings if i.price > 0]
+        if valid_items:
+            lowest_item = min(valid_items, key=lambda x: x.price)
+
         best_deal = None
         # Encontra o anúncio funcional com o melhor desconto percentual vs média nacional
         working_with_benchmark = [
@@ -79,6 +84,7 @@ class GPUHunterEngine:
             highest_price=max(prices) if prices else 0.0,
             average_price=round(sum(prices) / len(prices), 2) if prices else 0.0,
             best_deal=best_deal,
+            lowest_item=lowest_item,
             scanned_at=datetime.now().isoformat()
         )
 

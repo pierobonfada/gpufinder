@@ -65,4 +65,5 @@ class ScanSummary(BaseModel):
     highest_price: float = 0.0
     average_price: float = 0.0
     best_deal: Optional[GPUListing] = None
+    lowest_item: Optional[GPUListing] = None
     scanned_at: str = Field(default_factory=lambda: datetime.now().isoformat())
