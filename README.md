@@ -45,6 +45,57 @@ O sistema conta com enriquecimento em tempo real de **Capacidade Computacional (
 
 ---
 
+## 📦 Instalação Automática no Ubuntu 26.04 LTS (e 24.04 / 22.04)
+
+O GPU Finder possui um instalador totalmente automatizado (`install.sh`) que:
+1. Atualiza e instala todas as dependências de sistema via APT (`python3`, `python3-venv`, `python3-pip`, `git`, `build-essential`).
+2. Cria o ambiente virtual isolado (`.venv`) e instala os pacotes do `requirements.txt`.
+3. Instala o **Playwright Chromium** e todas as bibliotecas de sistema necessárias para execução headless.
+4. **Solicita interativamente as credenciais do Facebook Marketplace** (com digitação oculta de senha via `getpass`/`read -s`).
+5. Protege o arquivo `config.yaml` com permissões restritas de leitura/escrita (`chmod 600`).
+6. Valida todo o sistema executando a suíte de testes automatizados (`pytest`).
+7. Oferece o registro automático do serviço no **Systemd** (`gpufinder.service`) para inicialização no boot.
+
+### ⚡ Passo a Passo Rápido
+
+Basta clonar o repositório e executar o instalador:
+
+```bash
+git clone git@github.com:pierobonfada/gpufinder.git
+cd gpufinder
+chmod +x install.sh
+./install.sh
+```
+
+Durante a execução, o instalador perguntará:
+- **E-mail do Facebook** (opcional, pressione Enter para pular);
+- **Senha do Facebook** (a digitação fica oculta no terminal por segurança);
+- **Cidade centro de referência** (padrão: `Veranópolis`);
+- **Raio de busca em km** (padrão: `50`);
+- **Deseja instalar como serviço Systemd?** (`S/n`).
+
+---
+
+### 🤖 Modo Não Interativo / Desatendido (CI/CD ou Servidor VPS)
+
+Para instalar sem nenhuma interação no teclado (100% silencioso):
+
+```bash
+# Instalação completa aceitando todos os padrões
+./install.sh -y
+
+# Ou passando credenciais e parâmetros diretamente por argumentos:
+./install.sh \
+  --non-interactive \
+  --fb-email "seu_email@facebook.com" \
+  --fb-password "sua_senha_secreta" \
+  --center-city "Veranópolis" \
+  --radius 50 \
+  --service
+```
+
+---
+
 ## 🚀 Como Executar
 
 ### 1. Iniciar o Dashboard Web Interativo (Recomendado)
@@ -54,7 +105,7 @@ Para abrir o servidor local com o painel gráfico completo:
 ```
 ou
 ```bash
-.venv/bin/python run.py --server
+./run.sh --server
 ```
 Abra o navegador em: **`http://localhost:7860`**
 
@@ -62,6 +113,22 @@ Abra o navegador em: **`http://localhost:7860`**
 Se quiser apenas ver o relatório impresso no terminal:
 ```bash
 ./run.sh --scan
+```
+
+### 3. Gerenciamento pelo Systemd (Serviço em Segundo Plano)
+Se o serviço foi configurado no instalador:
+```bash
+# Iniciar o serviço
+sudo systemctl start gpufinder
+
+# Parar o serviço
+sudo systemctl stop gpufinder
+
+# Ver status operacional
+sudo systemctl status gpufinder
+
+# Acompanhar logs em tempo real
+journalctl -u gpufinder -f
 ```
 
 ---

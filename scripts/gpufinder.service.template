@@ -1,0 +1,20 @@
+[Unit]
+Description=GPU Finder - Servico de Monitoramento e Dashboard de GPUs
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__WORKDIR__
+ExecStart=__WORKDIR__/.venv/bin/python run.py --server
+Restart=always
+RestartSec=5
+Environment=PYTHONPATH=__WORKDIR__
+Environment=PATH=__WORKDIR__/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+
+# Seguranca e limites
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
