@@ -29,6 +29,32 @@ NVIDIA_GPU_CATALOG: Dict[str, Dict] = {
         "exclude": ["5070 ti"],
         "architecture": "Blackwell"
     },
+    "RTX 5060 Ti 16GB": {
+        "series": "GeForce",
+        "default_vram": 16,
+        "keywords": ["5060 ti 16gb", "5060ti 16gb", "5060 ti 16 gb", "5060ti 16 gb"],
+        "architecture": "Blackwell"
+    },
+    "RTX 5060 Ti": {
+        "series": "GeForce",
+        "default_vram": 8,
+        "keywords": ["rtx 5060 ti", "rtx 5060ti", "5060 ti", "5060ti"],
+        "exclude": ["16gb", "16 gb"],
+        "architecture": "Blackwell"
+    },
+    "RTX 5060 12GB": {
+        "series": "GeForce",
+        "default_vram": 12,
+        "keywords": ["5060 12gb", "5060 12 gb", "rtx 5060 12gb", "rtx 5060 12 gb"],
+        "architecture": "Blackwell"
+    },
+    "RTX 5060": {
+        "series": "GeForce",
+        "default_vram": 8,
+        "keywords": ["rtx 5060", "rtx5060", "geforce rtx 5060"],
+        "exclude": ["5060 ti", "5060ti", "12gb", "12 gb"],
+        "architecture": "Blackwell"
+    },
 
     # --- GeForce RTX 40 Series ---
     "RTX 4090": {
@@ -370,6 +396,7 @@ def is_non_nvidia(text: str) -> bool:
 MODEL_VALID_VRAMS: Dict[str, List[int]] = {
     # RTX 50
     "RTX 5090": [32], "RTX 5080": [16], "RTX 5070 Ti": [16], "RTX 5070": [12],
+    "RTX 5060 Ti 16GB": [16], "RTX 5060 Ti": [8, 16], "RTX 5060 12GB": [12], "RTX 5060": [8, 12],
     # RTX 40
     "RTX 4090": [24], "RTX 4080 Super": [16], "RTX 4080": [16], "RTX 4070 Ti Super": [16],
     "RTX 4070 Ti": [12], "RTX 4070 Super": [12], "RTX 4070": [12], "RTX 4060 Ti 16GB": [16],

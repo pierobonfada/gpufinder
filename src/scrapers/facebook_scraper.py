@@ -324,7 +324,7 @@ class FacebookMarketplaceScraper(BaseScraper):
 
         return listings
 
-    async def search_national(self, query: str) -> List[float]:
+    async def search_national(self, query: str, target_vram_gb: Optional[int] = None) -> List[float]:
         """Busca nacional no Facebook para fins de benchmark."""
         # O OLX e a base de referência são prioritários para estatísticas rápidas
         return []

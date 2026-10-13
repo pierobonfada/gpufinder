@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 from src.models import GPUListing
 
 class BaseScraper(ABC):
@@ -9,6 +9,6 @@ class BaseScraper(ABC):
         pass
 
     @abstractmethod
-    async def search_national(self, query: str) -> List[float]:
-        """Busca preços do mesmo modelo em todo o Brasil para cálculo de benchmark."""
+    async def search_national(self, query: str, target_vram_gb: Optional[int] = None) -> List[float]:
+        """Busca preços do mesmo modelo e variante de VRAM em todo o Brasil para cálculo de benchmark."""
         pass

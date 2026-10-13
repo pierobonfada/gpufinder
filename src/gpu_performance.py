@@ -472,6 +472,42 @@ GPU_COMPUTE_DATABASE: Dict[str, Dict] = {
         "display_name": "RTX 4090 (82.6 TFLOPS)",
         "source": "NVIDIA Whitepaper / TechPowerUp"
     },
+    "RTX 5060": {
+        "compute_tflops": 20.0,
+        "tensor_tflops": 320.0,
+        "memory_bandwidth_gbs": 336.0,
+        "architecture": "Blackwell (GB206)",
+        "vram_gb": 8,
+        "display_name": "RTX 5060 (20.0 TFLOPS)",
+        "source": "NVIDIA Whitepaper / TechPowerUp"
+    },
+    "RTX 5060 Ti": {
+        "compute_tflops": 26.5,
+        "tensor_tflops": 420.0,
+        "memory_bandwidth_gbs": 448.0,
+        "architecture": "Blackwell (GB206)",
+        "vram_gb": 16,
+        "display_name": "RTX 5060 Ti (26.5 TFLOPS)",
+        "source": "NVIDIA Whitepaper / TechPowerUp"
+    },
+    "RTX 5070": {
+        "compute_tflops": 33.5,
+        "tensor_tflops": 530.0,
+        "memory_bandwidth_gbs": 672.0,
+        "architecture": "Blackwell (GB205)",
+        "vram_gb": 12,
+        "display_name": "RTX 5070 (33.5 TFLOPS)",
+        "source": "NVIDIA Whitepaper / TechPowerUp"
+    },
+    "RTX 5070 Ti": {
+        "compute_tflops": 44.0,
+        "tensor_tflops": 700.0,
+        "memory_bandwidth_gbs": 896.0,
+        "architecture": "Blackwell (GB203)",
+        "vram_gb": 16,
+        "display_name": "RTX 5070 Ti (44.0 TFLOPS)",
+        "source": "NVIDIA Whitepaper / TechPowerUp"
+    },
     "RTX 5080": {
         "compute_tflops": 57.0,
         "tensor_tflops": 900.0,

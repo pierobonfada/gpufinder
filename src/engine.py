@@ -331,28 +331,32 @@ class GPUHunterEngine:
 
             # 7. Benchmark Nacional de Preços no Brasil
             if self.config.national_benchmark.enabled and filtered_by_location:
-                unique_models = set(
-                    item.detected_model 
+                # Agrupa por (modelo, vram) para diferenciar perfeitamente variantes de memória (ex: 8GB vs 12GB vs 16GB)
+                unique_pairs = set(
+                    (item.detected_model, item.detected_vram_gb) 
                     for item in filtered_by_location 
                     if item.detected_model != "Desconhecido"
                 )
-                for model in unique_models:
+                for model, vram in unique_pairs:
+                    label = f"{model} ({vram}GB)" if vram else model
                     self._log_progress(
                         8, total_steps,
-                        f"Pesquisando preços médios no Brasil para {model}...",
-                        f"🇧🇷 Benchmark Nacional: Buscando preços médios no mercado brasileiro para {model}..."
+                        f"Pesquisando preços médios no Brasil para {label}...",
+                        f"🇧🇷 Benchmark Nacional: Buscando preços médios no mercado brasileiro para {label}..."
                     )
                     try:
-                        national_prices = await self.olx_scraper.search_national(model)
+                        national_prices = await self.olx_scraper.search_national(model, target_vram_gb=vram)
                         if national_prices:
-                            self.benchmark_engine.update_model_stats(model, national_prices)
-                            self._log_progress(
-                                8, total_steps,
-                                f"Benchmark atualizado para {model}",
-                                f"📊 Mediana calculada para {model}: R$ {self.benchmark_engine.get_stats_for_model(model).median_price:,.2f}"
-                            )
+                            self.benchmark_engine.update_model_stats(model, national_prices, vram_gb=vram)
+                            stats = self.benchmark_engine.get_stats_for_model(model, vram_gb=vram)
+                            if stats:
+                                self._log_progress(
+                                    8, total_steps,
+                                    f"Benchmark atualizado para {label}",
+                                    f"📊 Mediana calculada para {label}: R$ {stats.median_price:,.2f}"
+                                )
                     except Exception as e:
-                        logger.debug(f"Benchmark nacional não respondeu para {model}: {e}")
+                        logger.debug(f"Benchmark nacional não respondeu para {label}: {e}")
 
                 filtered_by_location = self.benchmark_engine.enrich_all(filtered_by_location)
 

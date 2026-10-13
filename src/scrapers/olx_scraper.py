@@ -255,10 +255,14 @@ class OLXScraper(BaseScraper):
 
         return listings
 
-    async def search_national(self, query: str) -> List[float]:
+    async def search_national(self, query: str, target_vram_gb: Optional[int] = None) -> List[float]:
         """Busca preços do modelo em todo o Brasil no OLX (especificamente placas-de-video) para benchmark estatístico."""
         prices: List[float] = []
-        encoded_q = query.replace(" ", "%20")
+        search_term = query
+        if target_vram_gb and target_vram_gb > 0 and f"{target_vram_gb}gb" not in query.lower():
+            search_term = f"{query} {target_vram_gb}gb"
+
+        encoded_q = search_term.replace(" ", "%20")
         url = f"https://www.olx.com.br/informatica/placas-de-video?q={encoded_q}"
 
         try:
@@ -272,12 +276,17 @@ class OLXScraper(BaseScraper):
 
                     for ad in raw_ads:
                         p = ad.get("price", 0.0)
-                        # Descarta preços absurdos ou simbólicos (< R$ 200 ou > R$ 15.000)
-                        if 200.0 <= p <= 15000.0:
+                        # Descarta preços absurdos ou simbólicos (< R$ 200 ou > R$ 35.000)
+                        if 200.0 <= p <= 35000.0:
                             # Confirma que é a GPU pesquisada e NÃO um computador
                             info = identify_gpu(ad["title"], ad.get("description", ""), ad.get("url", ""))
-                            if info and info[0] == query:
-                                prices.append(p)
+                            if info:
+                                ad_model, ad_vram = info
+                                if ad_model == query or query.lower() in ad_model.lower():
+                                    # Validação estrita de VRAM: não mistura 8GB com 12GB ou 16GB
+                                    if target_vram_gb is not None and target_vram_gb > 0 and ad_vram != target_vram_gb:
+                                        continue
+                                    prices.append(p)
         except Exception as e:
             logger.debug(f"Erro no benchmark nacional OLX para '{query}': {e}")
 

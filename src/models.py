@@ -22,6 +22,7 @@ class OutlierType(str, Enum):
 
 class NationalStats(BaseModel):
     model_name: str
+    vram_gb: Optional[int] = None
     count: int = 0
     min_price: float = 0.0
     median_price: float = 0.0

@@ -1099,7 +1099,8 @@ function openBenchmarkModal(item) {
   const title = document.getElementById('bm-modal-title');
   const body = document.getElementById('bm-modal-body');
 
-  title.textContent = `Comparativo Nacional: ${item.detected_model}`;
+  const vramText = item.detected_vram_gb ? ` (${item.detected_vram_gb}GB)` : '';
+  title.textContent = `Comparativo Nacional: ${item.detected_model}${vramText}`;
 
   const bm = item.national_benchmark;
   if (!bm || bm.median_price <= 0) {
@@ -1123,7 +1124,7 @@ function openBenchmarkModal(item) {
         <span class="text-base font-bold text-white">${formatBRL(item.price)}</span>
       </div>
       <div class="flex items-center justify-between">
-        <span class="text-slate-400">Mediana Nacional (Brasil):</span>
+        <span class="text-slate-400">Mediana Nacional (Brasil${item.detected_vram_gb ? ' ' + item.detected_vram_gb + 'GB' : ''}):</span>
         <span class="text-base font-bold text-slate-300">${formatBRL(bm.median_price)}</span>
       </div>
       <div class="flex items-center justify-between pt-2 border-t border-slate-800">

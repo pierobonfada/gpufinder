@@ -331,3 +331,91 @@ def test_facebook_multi_search_terms():
     assert "gtx" in FacebookMarketplaceScraper.SEARCH_TERMS
     assert "nvidia" in FacebookMarketplaceScraper.SEARCH_TERMS
 
+def test_vram_specific_benchmark_isolation():
+    from src.benchmark import BenchmarkEngine
+    from src.config import NationalBenchmarkConfig
+    from src.models import GPUListing, PriceClassification
+
+    engine = BenchmarkEngine(NationalBenchmarkConfig())
+
+    # 1. RTX 5060: 8GB (R$ 2.300) vs 12GB (R$ 2.800)
+    stats_5060_8gb = engine.get_stats_for_model("RTX 5060", vram_gb=8)
+    stats_5060_12gb = engine.get_stats_for_model("RTX 5060", vram_gb=12)
+
+    assert stats_5060_8gb is not None
+    assert stats_5060_12gb is not None
+    assert stats_5060_8gb.median_price == 2300.0
+    assert stats_5060_12gb.median_price == 2800.0
+
+    # Mesma oferta por R$ 2.550:
+    # Para 8GB (mediana 2300): R$ +250 (+10.9%) -> EXPENSIVE / Cara
+    # Para 12GB (mediana 2800): R$ -250 (-8.9%) -> CHEAP / Barata
+    listing_5060_8gb = GPUListing(
+        id="t5060_8", title="RTX 5060 8GB", price=2550.0, platform="OLX", url="u1",
+        detected_model="RTX 5060", detected_vram_gb=8
+    )
+    listing_5060_12gb = GPUListing(
+        id="t5060_12", title="RTX 5060 12GB", price=2550.0, platform="OLX", url="u2",
+        detected_model="RTX 5060", detected_vram_gb=12
+    )
+
+    engine.enrich_listing(listing_5060_8gb)
+    engine.enrich_listing(listing_5060_12gb)
+
+    assert listing_5060_8gb.price_diff_percent > 0
+    assert listing_5060_8gb.price_classification == PriceClassification.EXPENSIVE
+
+    assert listing_5060_12gb.price_diff_percent < 0
+    assert listing_5060_12gb.price_classification == PriceClassification.CHEAP
+
+    # 2. RTX 4060 Ti: 8GB (R$ 2.350) vs 16GB (R$ 2.750)
+    stats_4060ti_8gb = engine.get_stats_for_model("RTX 4060 Ti", vram_gb=8)
+    stats_4060ti_16gb = engine.get_stats_for_model("RTX 4060 Ti", vram_gb=16)
+
+    assert stats_4060ti_8gb.median_price == 2350.0
+    assert stats_4060ti_16gb.median_price == 2750.0
+
+    # 3. RTX 3060: 8GB (R$ 1.150) vs 12GB (R$ 1.500)
+    stats_3060_8gb = engine.get_stats_for_model("RTX 3060", vram_gb=8)
+    stats_3060_12gb = engine.get_stats_for_model("RTX 3060", vram_gb=12)
+
+    assert stats_3060_8gb.median_price == 1150.0
+    assert stats_3060_12gb.median_price == 1500.0
+
+    # Anúncio de R$ 1.300
+    listing_3060_8gb = GPUListing(
+        id="t3060_8", title="RTX 3060 8GB", price=1300.0, platform="OLX", url="u3",
+        detected_model="RTX 3060", detected_vram_gb=8
+    )
+    listing_3060_12gb = GPUListing(
+        id="t3060_12", title="RTX 3060 12GB", price=1300.0, platform="OLX", url="u4",
+        detected_model="RTX 3060", detected_vram_gb=12
+    )
+    engine.enrich_listing(listing_3060_8gb)
+    engine.enrich_listing(listing_3060_12gb)
+
+    assert listing_3060_8gb.price_classification == PriceClassification.EXPENSIVE
+    assert listing_3060_12gb.price_classification == PriceClassification.CHEAP
+
+def test_outlier_detection_vram_group_isolation():
+    from src.outlier_detector import OutlierDetector
+    from src.models import GPUListing, OutlierType
+
+    # Se tivermos 3 unidades de RTX 3060 8GB a R$ 1100, 1150, 1200
+    # E 3 unidades de RTX 3060 12GB a R$ 1500, 1550, 1600
+    # O agrupamento não deve considerar a 12GB como outlier das 8GB
+    listings = [
+        GPUListing(id="1", title="RTX 3060 8GB", price=1100.0, platform="OLX", url="u1", detected_model="RTX 3060", detected_vram_gb=8),
+        GPUListing(id="2", title="RTX 3060 8GB", price=1150.0, platform="OLX", url="u2", detected_model="RTX 3060", detected_vram_gb=8),
+        GPUListing(id="3", title="RTX 3060 8GB", price=1200.0, platform="OLX", url="u3", detected_model="RTX 3060", detected_vram_gb=8),
+        GPUListing(id="4", title="RTX 3060 12GB", price=1500.0, platform="OLX", url="u4", detected_model="RTX 3060", detected_vram_gb=12),
+        GPUListing(id="5", title="RTX 3060 12GB", price=1550.0, platform="OLX", url="u5", detected_model="RTX 3060", detected_vram_gb=12),
+        GPUListing(id="6", title="RTX 3060 12GB", price=1600.0, platform="OLX", url="u6", detected_model="RTX 3060", detected_vram_gb=12),
+    ]
+
+    result = OutlierDetector.detect_outliers_iqr(listings)
+    # Nenhuma deve ser marcada como outlier indevidamente
+    for item in result:
+        assert item.is_outlier is False
+
+

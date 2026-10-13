@@ -166,8 +166,8 @@ async def trigger_scan(
     return {"status": "started", "message": "Varredura iniciada em segundo plano."}
 
 @app.get("/api/benchmark/{model_name}")
-async def get_model_benchmark(model_name: str):
-    stats = engine.benchmark_engine.get_stats_for_model(model_name)
+async def get_model_benchmark(model_name: str, vram: Optional[int] = Query(None)):
+    stats = engine.benchmark_engine.get_stats_for_model(model_name, vram_gb=vram)
     if not stats:
         raise HTTPException(status_code=404, detail="Modelo não encontrado no benchmark")
     return stats

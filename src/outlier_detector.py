@@ -49,13 +49,13 @@ class OutlierDetector:
                     item.is_outlier = True
                     item.outlier_type = OutlierType.HIGH
 
-        # 2. Avaliação complementar por grupo local do EXATO MESMO MODELO
-        # (Apenas se houver pelo menos 3 unidades do MESMO modelo na busca local)
+        # 2. Avaliação complementar por grupo local do EXATO MESMO MODELO E VRAM
+        # (Apenas se houver pelo menos 3 unidades do MESMO modelo e VRAM na busca local)
         model_groups = {}
         for item in listings:
-            model_groups.setdefault(item.detected_model, []).append(item)
+            model_groups.setdefault((item.detected_model, item.detected_vram_gb), []).append(item)
 
-        for model, group in model_groups.items():
+        for (model, vram), group in model_groups.items():
             if model == "Desconhecido":
                 continue
 
